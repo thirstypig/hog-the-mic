@@ -6,10 +6,10 @@ import { searchLyrics, searchLRCLibDatabase } from "./lrclib";
 import { LalalAIService } from "./lalalai";
 import { GaudioStudioService } from "./gaudio";
 import { insertSongSchema, insertPerformanceSchema, insertPlaylistSchema, insertPlaylistSongSchema } from "@shared/schema";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+import { setupAuth, isAuthenticated } from "./auth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Setup Replit Auth
+  // Setup authentication
   await setupAuth(app);
 
   // Auth route - get current user
