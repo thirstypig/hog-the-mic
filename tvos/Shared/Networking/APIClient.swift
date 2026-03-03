@@ -34,7 +34,7 @@ final class APIClient: ObservableObject {
 
     private init() {
         self.baseURL = UserDefaults.standard.string(forKey: "api_base_url")
-            ?? "http://localhost:3000"
+            ?? "http://192.168.6.12:3000"
 
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 30

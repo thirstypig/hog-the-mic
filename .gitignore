@@ -9,4 +9,6 @@ mobile/.expo/
 # tvOS
 tvos/.build/
 tvos/KTVSinger.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
+tvos/KTVSinger.xcodeproj/project.xcworkspace/xcuserdata/
+tvos/KTVSinger.xcodeproj/xcuserdata/
 tvos/Package.resolved

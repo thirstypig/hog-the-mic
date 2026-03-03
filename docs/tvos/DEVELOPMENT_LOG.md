@@ -4,7 +4,7 @@
 Port of React Native KTV Singer karaoke app to native tvOS using Swift, SwiftUI, and Supabase.
 
 **Started:** March 2, 2026
-**Status:** In Active Development - Phase 1 (Setup)
+**Status:** Working MVP — tested on Apple TV Simulator and real Apple TV 4K
 
 ---
 
@@ -550,5 +550,75 @@ New dependency: `@distube/ytdl-core`
 
 ---
 
-**Last Updated:** March 2, 2026
-**Next Review:** After first successful build in Xcode
+---
+
+### Session 3: Xcode Project, Simulator & Real Apple TV Testing (March 3, 2026)
+
+#### Goal
+Get the app building in Xcode, running on Apple TV Simulator, and deployed to a real Apple TV 4K.
+
+#### Completed
+
+**Xcode Project Generation**
+- Installed XcodeGen (`brew install xcodegen`)
+- Created `tvos/project.yml` — declarative project spec
+- Generated `KTVSinger.xcodeproj` with SPM dependency (supabase-swift v2.0.0+)
+- Bundle ID: `com.ktvsinger.tvos`, deployment target: tvOS 17.0
+- `NSAllowsArbitraryLoads: true` for dev (HTTP to local server)
+
+**Build Fixes (Swift Strict Concurrency)**
+- `SupabaseClient` → renamed to `AppSupabaseClient` (naming conflict with Supabase SDK)
+- Added `private typealias SDKClient = Supabase.SupabaseClient` for internal use
+- `PlayerViewModel` init: moved default parameters to init body (MainActor isolation)
+- `.textFieldStyle(.roundedBorder)` → `.plain` (unavailable on tvOS)
+- Added `@unknown default` to `AuthChangeEvent` switch
+- Removed `deinit` from `YouTubePlayerService` (can't call MainActor-isolated cleanup from deinit)
+- Wrapped actor-isolated `WebSocketServer` calls in `Task { await ... }` blocks
+
+**Simulator Testing**
+- Built and ran on Apple TV Simulator
+- Verified songs load from Express API (`GET /api/songs`)
+- Verified YouTube streaming endpoint works (`GET /api/youtube/stream/:videoId`)
+- Song card initially didn't respond to Siri Remote — `.onTapGesture` doesn't work on tvOS
+- Fixed by wrapping `SongCard` in `Button` with `.buttonStyle(.card)`
+- Verified player opens with video playing via AVPlayer
+- Verified lyrics sync with video playback (active line highlighted)
+
+**Real Apple TV Deployment**
+- Paired Apple TV 4K with Xcode via Wi-Fi
+- Fixed code signing: changed `project.yml` from `CODE_SIGNING_ALLOWED: "NO"` to `CODE_SIGN_STYLE: Automatic`
+- Regenerated Xcode project, set team in Signing & Capabilities
+- Updated `APIClient` default URL from `localhost:3000` to `192.168.6.12:3000` (Mac's local IP)
+- Successfully deployed and ran on real Apple TV 4K
+- Video playback works, lyrics sync works
+- Observed audio dropout during playback (video and lyrics continue) — likely ytdl-core format issue
+
+#### Key Learnings
+
+1. **tvOS focus engine**: `.onTapGesture` does NOT work with Siri Remote. Always use `Button` for selectable elements.
+2. **Supabase SDK v2 naming**: The SDK has its own `SupabaseClient` class — rename your wrapper to avoid conflicts.
+3. **Swift strict concurrency**: `deinit` cannot call MainActor-isolated methods. Use explicit `stop()`/`cleanup()` instead.
+4. **Default parameters in MainActor init**: `init(service: Foo = Foo())` fails if `Foo.init` is MainActor-isolated. Move defaults to the init body.
+5. **XcodeGen is essential**: Generating `.xcodeproj` from YAML is far more reliable than hand-editing `project.pbxproj`.
+6. **Code signing for real device**: Must set `CODE_SIGN_STYLE: Automatic` and select a team. Free Apple ID works but apps expire after 7 days.
+7. **ytdl-core format selection**: Prefer combined (muxed) mp4 formats for AVPlayer. Separate audio+video streams can cause audio dropout.
+
+#### PR #2 Merged
+- Branch: `feat/tvos-mvp`
+- 31 files changed, 1700 insertions, 812 deletions
+- 5 new files, 12 modified files, 1 new dependency
+
+---
+
+### Open Issues
+
+| Issue | Severity | Notes |
+|-------|----------|-------|
+| Audio drops during playback | Medium | Video and lyrics continue; likely ytdl-core selecting video-only format |
+| Server URL hardcoded to local IP | Low | Need Bonjour/mDNS discovery or in-app settings |
+| Free dev account 7-day expiry | Low | Need Apple Developer Program ($99/yr) for TestFlight |
+
+---
+
+**Last Updated:** March 3, 2026
+**Next Review:** Next development session

@@ -6,9 +6,9 @@ YouTube-powered karaoke app with synced lyrics, scoring, playlists, and vocal se
 
 | Directory | Purpose | Tech |
 |-----------|---------|------|
-| `server/` | REST API, YouTube search, lyrics, scoring, auth | Express, Drizzle ORM, Supabase PostgreSQL, Passport.js |
+| `server/` | REST API, YouTube search, lyrics, scoring, auth, streaming | Express, Drizzle ORM, Supabase PostgreSQL, Passport.js, ytdl-core |
 | `mobile/` | iOS/Android/web client | Expo, React Native, NativeWind, React Navigation |
-| `tvos/` | Native Apple TV port (in progress) | SwiftUI, AVKit, Supabase |
+| `tvos/` | Native Apple TV app (working MVP) | SwiftUI, AVPlayer, Supabase Auth |
 | `shared/` | Database schema shared between server and mobile | Drizzle ORM, Zod |
 | `docs/` | Extended documentation (tvOS setup, architecture) | Markdown |
 
@@ -140,13 +140,59 @@ features/<name>/
 
 Each feature exports through `index.ts`. No cross-feature imports — features communicate through the server API or shared schema types.
 
+## tvOS App
+
+The tvOS app is a working MVP that runs on Apple TV Simulator and real Apple TV 4K hardware.
+
+### What works
+- Song browser with search, genre filtering, and sorting
+- YouTube video playback via AVPlayer (server-side stream URL extraction)
+- Synced lyrics display with adjustable offset (+/- 0.5s)
+- Favorites (requires Supabase auth)
+- Settings screen showing server connection status
+
+### tvOS Quick Start
+
+```bash
+# Prerequisites: Xcode 15+, XcodeGen (brew install xcodegen)
+
+# 1. Start the Express server (from project root)
+npm run dev:server
+
+# 2. Generate Xcode project (from tvos/)
+cd tvos && xcodegen generate
+
+# 3. Open in Xcode
+open KTVSinger.xcodeproj
+
+# 4. Select "Apple TV" simulator (or real device) and press Cmd+R
+```
+
+### Testing on Real Apple TV
+
+1. **Pair** your Apple TV in Xcode → Window → Devices and Simulators
+2. **Sign** the app: select your team in Signing & Capabilities
+3. **Update server URL**: edit `tvos/Shared/Networking/APIClient.swift` default URL to your Mac's local IP (e.g., `http://192.168.x.x:3000`)
+4. **Build and run** (Cmd+R) with Apple TV selected as destination
+5. **Trust developer** on Apple TV: Settings → General → Device Management (first run only)
+6. Note: free developer accounts expire after 7 days — re-deploy from Xcode when needed
+
+### tvOS Architecture
+
+```
+Apple TV → APIClient → Express Server → Supabase PostgreSQL (songs)
+                    → /api/youtube/stream/:videoId → ytdl-core → YouTube CDN → AVPlayer
+```
+
+The tvOS app does **not** query Supabase directly for songs. It uses the Express API as the single data source. Supabase on tvOS is auth-only (sign in, favorites with RLS).
+
 ## Project Status
 
 | Component | Status |
 |-----------|--------|
 | Server API | Working |
 | Mobile (Expo) | Working |
-| tvOS (SwiftUI) | In progress — code scaffolded, needs Xcode project setup |
+| tvOS (SwiftUI) | Working MVP — tested on Simulator and Apple TV 4K |
 | Web client | Removed (was Vite+React, migrated to React Native) |
 
 ## License

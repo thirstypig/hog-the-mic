@@ -2,13 +2,13 @@
 
 ## Project Overview
 
-YouTube-powered karaoke monorepo: Express API server + React Native mobile client + in-progress tvOS port. The web client (Vite+React) has been removed; all frontend work is in `mobile/`.
+YouTube-powered karaoke monorepo: Express API server + React Native mobile client + native tvOS app. The web client (Vite+React) has been removed; all frontend work is in `mobile/`.
 
 ## Monorepo Layout
 
 - `server/` — Express REST API (Node.js, TypeScript, ES modules)
 - `mobile/` — Expo React Native app (iOS, Android, web)
-- `tvos/` — Native tvOS port (SwiftUI, in progress)
+- `tvos/` — Native tvOS app (SwiftUI, AVPlayer, working MVP)
 - `shared/` — Drizzle ORM schemas shared between server and mobile
 - `docs/tvos/` — tvOS setup and architecture documentation
 
@@ -30,6 +30,29 @@ npm start               # Expo dev server
 npm run ios             # iOS simulator
 npm run check           # TypeScript type check
 ```
+
+### tvOS (run from tvos/)
+
+```bash
+xcodegen generate       # Regenerate Xcode project from project.yml
+# Then open KTVSinger.xcodeproj in Xcode
+```
+
+**Building tvOS from CLI:**
+```bash
+# Simulator
+xcodebuild -project KTVSinger.xcodeproj -scheme KTVSinger \
+  -destination 'platform=tvOS Simulator,name=Apple TV' build
+
+# Real device: use Xcode GUI (needs signing)
+```
+
+**Testing on Apple TV (real device):**
+1. Pair Apple TV via Xcode → Window → Devices and Simulators
+2. Set signing team in Xcode (Signing & Capabilities tab)
+3. Select your Apple TV as destination, press Cmd+R
+4. First run: trust developer profile on Apple TV (Settings → General → Device Management)
+5. **Server must be running** on your Mac and reachable from Apple TV's network
 
 ## Feature Module Pattern
 
@@ -91,6 +114,13 @@ Mobile features: auth, library, player, playlist, scoring, search, vocal-separat
 - `mobile/src/screens/` — Screen components (4 screens)
 - `mobile/src/features/` — Feature modules
 - `mobile/src/common/` — Shared components, hooks, utils
+- `tvos/project.yml` — XcodeGen project spec (source of truth for Xcode project)
+- `tvos/KTVSingerApp.swift` — tvOS app entry point
+- `tvos/Shared/Networking/APIClient.swift` — HTTP client for Express API
+- `tvos/Shared/Database/SupabaseClient.swift` — Supabase auth wrapper (`AppSupabaseClient`)
+- `tvos/Shared/Models/Song.swift` — Song model (matches server schema)
+- `tvos/Features/Player/` — Player view, view model, YouTube/lyrics services
+- `tvos/Features/SongBrowser/` — Song browser view and view model
 
 ## Rules
 
@@ -104,3 +134,26 @@ Mobile features: auth, library, player, playlist, scoring, search, vocal-separat
 - **Keep feature modules self-contained.** New functionality should be a new feature module or extend an existing one, not scattered across the codebase.
 - **Preserve the auth-optional pattern.** Dev mode must work without Google OIDC credentials configured.
 - **Do not modify shared/schema without running db:push.** Schema changes require a database migration step.
+- **tvOS Xcode project is generated from project.yml.** Run `xcodegen generate` in `tvos/` after changing `project.yml`. Do not hand-edit `project.pbxproj`.
+- **tvOS uses `AppSupabaseClient` (not `SupabaseClient`)** to avoid naming conflict with the Supabase SDK's own `SupabaseClient` class.
+- **tvOS APIClient base URL** is hardcoded to a local IP. When changing networks, update `tvos/Shared/Networking/APIClient.swift` default URL or change it in-app via Settings.
+- **Use `npx tsc --noEmit` instead of `npm run check:server`** for server type checking (`tsconfig.server.json` doesn't exist).
+
+## tvOS Architecture Notes
+
+- tvOS app fetches songs from Express API via `APIClient` (not direct Supabase queries)
+- Supabase client on tvOS is auth-only: sign in/up, favorites (RLS)
+- YouTube streaming: server extracts playable URLs via `@distube/ytdl-core` → tvOS plays via AVPlayer
+- Data flow: tvOS → `GET /api/songs` → Express → Supabase PostgreSQL
+- Video flow: tvOS → `GET /api/youtube/stream/:videoId` → Express → ytdl-core → direct YouTube CDN URL → AVPlayer
+- Lyrics come embedded in the song record from the server (fetched from LRCLIB at song creation time)
+- Stream URLs are cached server-side for 4 hours (they expire after ~6 hours)
+- Bundle ID: `com.ktvsinger.tvos`, deployment target: tvOS 17.0
+- SPM dependency: `supabase-swift` v2.0.0+
+
+## Known Issues
+
+- `npm run check:server` references nonexistent `tsconfig.server.json` — use `npx tsc --noEmit` instead
+- Audio can drop during playback while video continues (ytdl-core may return formats with separate audio/video tracks; prefer combined mp4)
+- Free Apple Developer account: apps on real device expire after 7 days, need re-deploy
+- tvOS `.onTapGesture` doesn't work with Siri Remote — always use `Button` for selectable elements

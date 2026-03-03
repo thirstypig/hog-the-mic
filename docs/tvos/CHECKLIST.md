@@ -21,68 +21,30 @@
 - [ ] (Optional) Configure Sign in with Apple
 
 ### Xcode Project Setup
-- [ ] Open Xcode
-- [ ] File → New → Project
-- [ ] Select tvOS → App
-- [ ] Product Name: "KTVSinger"
-- [ ] Organization ID: "com.yourcompany" (use yours)
-- [ ] Interface: SwiftUI
-- [ ] Language: Swift
-- [ ] Create project
-- [ ] File → Add Package Dependencies
-- [ ] Add: https://github.com/supabase/supabase-swift.git
-- [ ] Select version 2.0.0+
-- [ ] Add to KTVSinger target
+- [x] Install XcodeGen: `brew install xcodegen`
+- [x] Project spec: `tvos/project.yml` (declarative, version-controlled)
+- [x] Generate project: `cd tvos && xcodegen generate`
+- [x] SPM dependency: supabase-swift v2.0.0+ (configured in project.yml)
+- [x] Bundle ID: `com.ktvsinger.tvos`
+- [x] Deployment target: tvOS 17.0
 
 ### Environment Configuration
-- [ ] Product → Scheme → Edit Scheme
-- [ ] Run → Arguments → Environment Variables
-- [ ] Add variable: SUPABASE_URL
-- [ ] Set value: (your Supabase project URL)
-- [ ] Add variable: SUPABASE_ANON_KEY
-- [ ] Set value: (your Supabase anon key)
-- [ ] Close scheme editor
-
-### Project Structure
-- [ ] Create folder: Shared/Models
-- [ ] Create folder: Shared/Database
-- [ ] Create folder: Shared/Services
-- [ ] Create folder: Features/Player/Views
-- [ ] Create folder: Features/Player/ViewModels
-- [ ] Create folder: Features/Player/Services
-- [ ] Create folder: Features/SongBrowser/Views
-- [ ] Create folder: Features/SongBrowser/ViewModels
-- [ ] Create folder: Features/Authentication/Views
-- [ ] Create folder: Features/Favorites/Views
-- [ ] Create folder: Features/Settings/Views
-- [ ] Create folder: Features/Pairing/Views
-- [ ] Create folder: tvOS
-
-### Copy Source Files
-- [ ] Copy Song.swift to Shared/Models/
-- [ ] Copy DeviceConnection.swift to Shared/Models/
-- [ ] Copy SupabaseClient.swift to Shared/Database/
-- [ ] Copy DevicePairingService.swift to Shared/Services/
-- [ ] Copy PlayerView.swift to Features/Player/Views/
-- [ ] Copy PlayerViewModel.swift to Features/Player/ViewModels/
-- [ ] Copy YouTubePlayerService.swift to Features/Player/Services/
-- [ ] Copy LyricsSyncService.swift to Features/Player/Services/
-- [ ] Copy SongBrowserView.swift to Features/SongBrowser/Views/
-- [ ] Copy SongBrowserViewModel.swift to Features/SongBrowser/ViewModels/
-- [ ] Copy AuthenticationView.swift to Features/Authentication/Views/
-- [ ] Copy FavoritesView.swift to Features/Favorites/Views/
-- [ ] Copy SettingsView.swift to Features/Settings/Views/
-- [ ] Copy PairingView.swift to Features/Pairing/Views/
-- [ ] Copy KTVSingerApp.swift to tvOS/
-- [ ] Add all files to Xcode project (drag & drop or File → Add Files)
+- [x] Supabase credentials are optional (app works in server-only mode)
+- [x] If using Supabase auth: set SUPABASE_URL and SUPABASE_ANON_KEY in scheme environment variables
+- [x] APIClient base URL defaults to local server (configurable in code or in-app Settings)
 
 ### Initial Build
-- [ ] Select "KTVSinger (tvOS)" scheme
-- [ ] Select "Apple TV" simulator
-- [ ] Product → Build (⌘B)
-- [ ] Fix any import errors (should be minimal)
-- [ ] Product → Run (⌘R)
-- [ ] App should launch and show authentication screen
+- [x] Build for Apple TV Simulator (⌘B) — **WORKING**
+- [x] Run on Apple TV Simulator (⌘R) — **WORKING**
+- [x] App launches to song browser (no auth wall)
+
+### Real Apple TV Deployment
+- [x] Pair Apple TV via Xcode → Window → Devices and Simulators
+- [x] Set `CODE_SIGN_STYLE: Automatic` in project.yml, regenerate
+- [x] Select team in Xcode Signing & Capabilities
+- [x] Update APIClient default URL to Mac's local IP
+- [x] Build and run on Apple TV 4K — **WORKING**
+- [x] Trust developer profile on Apple TV (Settings → General → Device Management)
 
 ## 📋 Phase 2: Backend Integration (1-2 hours)
 
@@ -99,15 +61,16 @@
 - [ ] Test video playback
 
 ### Test Core Features
-- [ ] Launch app
-- [ ] App should show song browser (no auth wall)
-- [ ] Songs from Express API should appear
-- [ ] Click on a song
-- [ ] Player screen should appear
-- [ ] Video should load via stream endpoint
-- [ ] Lyrics should display and sync
-- [ ] Test +0.5s / -0.5s offset buttons
-- [ ] Back button should return to browser
+- [x] Launch app
+- [x] App should show song browser (no auth wall)
+- [x] Songs from Express API should appear
+- [x] Click on a song (must use Button, not onTapGesture on tvOS)
+- [x] Player screen should appear
+- [x] Video should load via stream endpoint
+- [x] Lyrics should display and sync
+- [x] Test +0.5s / -0.5s offset buttons
+- [x] Back button should return to browser
+- [ ] **Known issue**: Audio can drop during playback (video continues)
 
 ## 📋 Phase 3: Polish & Testing (2-3 hours)
 
