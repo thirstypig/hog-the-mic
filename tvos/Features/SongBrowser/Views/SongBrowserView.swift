@@ -154,11 +154,12 @@ struct SongBrowserView: View {
                 spacing: 30
             ) {
                 ForEach(viewModel.filteredSongs) { song in
-                    SongCard(song: song)
-                        .onTapGesture {
-                            selectedSong = song
-                        }
-                        .buttonStyle(.card)
+                    Button {
+                        selectedSong = song
+                    } label: {
+                        SongCard(song: song)
+                    }
+                    .buttonStyle(.card)
                 }
             }
             .padding(.horizontal, 48)
