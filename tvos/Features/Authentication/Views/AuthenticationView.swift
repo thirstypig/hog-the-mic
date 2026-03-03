@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct AuthenticationView: View {
-    @EnvironmentObject var supabase: SupabaseClient
+    @EnvironmentObject var supabase: AppSupabaseClient
     @State private var email = ""
     @State private var password = ""
     @State private var isSignUp = false
@@ -43,7 +43,7 @@ struct AuthenticationView: View {
                 // Auth form
                 VStack(spacing: 24) {
                     TextField("Email", text: $email)
-                        .textFieldStyle(.roundedBorder)
+                        .textFieldStyle(.plain)
                         .textContentType(.emailAddress)
                         .autocapitalization(.none)
                         .font(.title3)
@@ -51,7 +51,7 @@ struct AuthenticationView: View {
                         .frame(maxWidth: 600)
                     
                     SecureField("Password", text: $password)
-                        .textFieldStyle(.roundedBorder)
+                        .textFieldStyle(.plain)
                         .textContentType(isSignUp ? .newPassword : .password)
                         .font(.title3)
                         .padding(.horizontal, 40)
@@ -134,5 +134,5 @@ struct AuthenticationView: View {
 
 #Preview {
     AuthenticationView()
-        .environmentObject(SupabaseClient.shared)
+        .environmentObject(AppSupabaseClient.shared)
 }

@@ -478,5 +478,77 @@ We're prioritizing:
 
 ---
 
+---
+
+### Session 2: Working MVP — Compilation, Data Alignment, Streaming (March 2, 2026)
+
+#### Goal
+Get the tvOS app to a working state: compiles, launches to song browser (no auth gate), loads songs from Express API, plays YouTube video via AVPlayer.
+
+#### Completed
+
+**Phase 0: Fix Compilation & Remove Auth Gate**
+- Fixed `DevicePairingService.swift` — added `import UIKit` for `UIImage`/`UIDevice`
+- Fixed `SupabaseClient.swift` — removed `fatalError` when env vars missing; now optional init (server-only mode)
+- Removed auth gate from `KTVSingerApp.swift` — app always shows TabView (Browse, Favorites, Settings)
+- Added `notConfigured` error case to `SupabaseError`
+
+**Phase 1: Data Layer Alignment**
+- Created `Shared/Networking/APIClient.swift` — HTTP client targeting Express server at localhost:3000
+- Created `Shared/Networking/APIError.swift` — typed error enum
+- Rewrote `Song.swift` to match server schema (String id, snake_case fields, simplified LyricLine with `time`+`text`)
+- Updated `LyricsSyncService.swift` — works with new `LyricLine.time` (not `startTime`/`endTime`)
+- Updated `SongBrowserViewModel.swift` — uses `APIClient` instead of `SupabaseClient` for songs
+- Updated `PlayerViewModel.swift` — sets per-song lyrics offset from server
+- Updated `SongBrowserView.swift` — uses `song.thumbnailImageURL`, `song.genre` (non-optional), `song.year`
+- Updated `PlayerView.swift` — added "Try Again" button in error state
+- Updated `FavoritesView.swift` — shows sign-in prompt when Supabase not configured
+- Updated `SettingsView.swift` — shows server API URL, handles no-auth state
+- Trimmed `SupabaseClient` — removed song CRUD methods, kept auth + favorites only
+- Changed favorite methods to use `String` song IDs (matching server schema)
+
+**Phase 2: YouTube Streaming**
+- Created `server/features/streaming/` feature module (3 files: index, routes, service)
+- `GET /api/youtube/stream/:videoId` — extracts playable stream URL via `@distube/ytdl-core`
+- Prefers combined mp4 formats for AVPlayer compatibility
+- In-memory cache with 4-hour TTL (YouTube URLs expire ~6hrs)
+- Registered streaming routes in `server/routes.ts`
+- Installed `@distube/ytdl-core` dependency
+- Updated `YouTubePlayerService.swift` — uses `APIClient.shared.getStreamURL()` instead of placeholder URL
+- Server TypeScript compiles cleanly (`npx tsc --noEmit` passes)
+
+**Architecture Decision: tvOS → Express API (not direct Supabase)**
+- Songs now flow: tvOS → Express API → Supabase PostgreSQL
+- Supabase client on tvOS is auth-only (sign in, favorites RLS)
+- This matches the mobile app's architecture
+- Updated ARCHITECTURE.md diagram
+
+#### Files Changed (17 total)
+
+New files (5):
+- `tvos/Shared/Networking/APIClient.swift`
+- `tvos/Shared/Networking/APIError.swift`
+- `server/features/streaming/index.ts`
+- `server/features/streaming/streaming.routes.ts`
+- `server/features/streaming/streaming.service.ts`
+
+Modified files (12):
+- `tvos/KTVSingerApp.swift`
+- `tvos/Shared/Database/SupabaseClient.swift`
+- `tvos/Shared/Services/DevicePairingService.swift`
+- `tvos/Shared/Models/Song.swift`
+- `tvos/Features/Player/Services/LyricsSyncService.swift`
+- `tvos/Features/Player/Services/YouTubePlayerService.swift`
+- `tvos/Features/Player/Views/PlayerView.swift`
+- `tvos/Features/Player/ViewModels/PlayerViewModel.swift`
+- `tvos/Features/SongBrowser/Views/SongBrowserView.swift`
+- `tvos/Features/SongBrowser/ViewModels/SongBrowserViewModel.swift`
+- `tvos/Features/Favorites/Views/FavoritesView.swift`
+- `server/routes.ts`
+
+New dependency: `@distube/ytdl-core`
+
+---
+
 **Last Updated:** March 2, 2026
-**Next Review:** After Xcode project setup complete
+**Next Review:** After first successful build in Xcode

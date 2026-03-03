@@ -12,13 +12,13 @@ struct SongBrowserView: View {
     @State private var selectedSong: Song?
     @State private var showingPlayer = false
     @FocusState private var focusedField: FocusableField?
-    
+
     enum FocusableField {
         case search
         case genreFilter
         case sortOptions
     }
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -29,14 +29,14 @@ struct SongBrowserView: View {
                     endPoint: .bottom
                 )
                 .ignoresSafeArea()
-                
+
                 VStack(spacing: 0) {
                     // Header with search and filters
                     header
                         .padding(.horizontal, 48)
                         .padding(.top, 40)
                         .padding(.bottom, 20)
-                    
+
                     // Song grid
                     if viewModel.isLoading {
                         loadingView
@@ -52,28 +52,26 @@ struct SongBrowserView: View {
             }
         }
     }
-    
+
     // MARK: - Header
-    
+
     private var header: some View {
         VStack(spacing: 20) {
-            // Title
             HStack {
-                Text("🎤 KTV Singer")
+                Text("KTV Singer")
                     .font(.system(size: 56, weight: .bold))
                     .foregroundColor(.white)
-                
+
                 Spacer()
             }
-            
-            // Search and filters
+
             HStack(spacing: 20) {
                 // Search field
                 HStack {
                     Image(systemName: "magnifyingglass")
                         .foregroundColor(.white.opacity(0.6))
                         .font(.title2)
-                    
+
                     TextField("Search songs or artists...", text: $viewModel.searchQuery)
                         .textFieldStyle(.plain)
                         .font(.title3)
@@ -84,15 +82,15 @@ struct SongBrowserView: View {
                 .background(Color.white.opacity(0.1))
                 .cornerRadius(12)
                 .frame(maxWidth: 800)
-                
+
                 // Genre filter
                 Menu {
                     Button("All Genres") {
                         viewModel.selectGenre(nil)
                     }
-                    
+
                     Divider()
-                    
+
                     ForEach(viewModel.availableGenres, id: \.self) { genre in
                         Button(genre) {
                             viewModel.selectGenre(genre)
@@ -111,7 +109,7 @@ struct SongBrowserView: View {
                     .cornerRadius(12)
                 }
                 .focused($focusedField, equals: .genreFilter)
-                
+
                 // Sort options
                 Menu {
                     ForEach(SongBrowserViewModel.SortOption.allCases, id: \.self) { option in
@@ -144,9 +142,9 @@ struct SongBrowserView: View {
             }
         }
     }
-    
+
     // MARK: - Song Grid
-    
+
     private var songGrid: some View {
         ScrollView {
             LazyVGrid(
@@ -156,20 +154,21 @@ struct SongBrowserView: View {
                 spacing: 30
             ) {
                 ForEach(viewModel.filteredSongs) { song in
-                    SongCard(song: song)
-                        .onTapGesture {
-                            selectedSong = song
-                        }
-                        .buttonStyle(.card)
+                    Button {
+                        selectedSong = song
+                    } label: {
+                        SongCard(song: song)
+                    }
+                    .buttonStyle(.card)
                 }
             }
             .padding(.horizontal, 48)
             .padding(.bottom, 60)
         }
     }
-    
+
     // MARK: - Loading View
-    
+
     private var loadingView: some View {
         VStack(spacing: 30) {
             ProgressView()
@@ -180,25 +179,25 @@ struct SongBrowserView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
-    
+
     // MARK: - Empty View
-    
+
     private var emptyView: some View {
         VStack(spacing: 30) {
             Image(systemName: "music.note.list")
                 .font(.system(size: 100))
                 .foregroundColor(.white.opacity(0.3))
-            
+
             Text("No songs found")
                 .font(.title)
                 .foregroundColor(.white)
-            
+
             if !viewModel.searchQuery.isEmpty {
                 Text("Try a different search term")
                     .font(.title3)
                     .foregroundColor(.white.opacity(0.6))
             }
-            
+
             Button("Refresh") {
                 Task {
                     await viewModel.refresh()
@@ -215,11 +214,11 @@ struct SongBrowserView: View {
 
 struct SongCard: View {
     let song: Song
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Thumbnail
-            if let thumbnailURL = song.thumbnailURL {
+            if let thumbnailURL = song.thumbnailImageURL {
                 AsyncImage(url: thumbnailURL) { image in
                     image
                         .resizable()
@@ -252,7 +251,7 @@ struct SongCard: View {
                     )
                     .clipShape(RoundedRectangle(cornerRadius: 16))
             }
-            
+
             // Song info
             VStack(alignment: .leading, spacing: 6) {
                 Text(song.title)
@@ -260,26 +259,24 @@ struct SongCard: View {
                     .fontWeight(.semibold)
                     .foregroundColor(.white)
                     .lineLimit(2)
-                
+
                 Text(song.artist)
                     .font(.body)
                     .foregroundColor(.white.opacity(0.7))
                     .lineLimit(1)
-                
+
                 HStack {
-                    if let genre = song.genre {
-                        Text(genre)
-                            .font(.caption)
-                            .foregroundColor(.white.opacity(0.6))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color.white.opacity(0.1))
-                            .cornerRadius(6)
-                    }
-                    
+                    Text(song.genre)
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.6))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.white.opacity(0.1))
+                        .cornerRadius(6)
+
                     Spacer()
-                    
-                    Text(formatDuration(song.duration))
+
+                    Text(String(song.year))
                         .font(.caption)
                         .foregroundColor(.white.opacity(0.6))
                 }
@@ -290,12 +287,6 @@ struct SongCard: View {
         .background(Color.white.opacity(0.05))
         .cornerRadius(20)
         .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: 5)
-    }
-    
-    private func formatDuration(_ duration: TimeInterval) -> String {
-        let minutes = Int(duration) / 60
-        let seconds = Int(duration) % 60
-        return String(format: "%d:%02d", minutes, seconds)
     }
 }
 

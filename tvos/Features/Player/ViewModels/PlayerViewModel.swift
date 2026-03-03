@@ -31,14 +31,10 @@ final class PlayerViewModel: ObservableObject {
     
     // MARK: - Initialization
     
-    init(
-        song: Song,
-        playerService: YouTubePlayerService = YouTubePlayerService(),
-        lyricsService: LyricsSyncService = LyricsSyncService()
-    ) {
+    init(song: Song) {
         self.song = song
-        self.playerService = playerService
-        self.lyricsService = lyricsService
+        self.playerService = YouTubePlayerService()
+        self.lyricsService = LyricsSyncService()
         
         setupBindings()
         loadSong()
@@ -78,9 +74,10 @@ final class PlayerViewModel: ObservableObject {
     }
     
     private func loadSong() {
-        // Load lyrics
+        // Load lyrics with per-song offset from server
         lyricsService.loadLyrics(song.lyrics)
-        
+        lyricsService.setOffset(song.lyricsOffset)
+
         // Load video
         Task {
             await playerService.loadVideo(videoId: song.videoId)

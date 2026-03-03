@@ -8,10 +8,11 @@
 import SwiftUI
 
 struct SettingsView: View {
-    @EnvironmentObject var supabase: SupabaseClient
+    @EnvironmentObject var supabase: AppSupabaseClient
     @EnvironmentObject var pairingService: DevicePairingService
+    @StateObject private var apiClient = APIClient.shared
     @State private var showSignOutAlert = false
-    
+
     var body: some View {
         ZStack {
             LinearGradient(
@@ -20,19 +21,28 @@ struct SettingsView: View {
                 endPoint: .bottom
             )
             .ignoresSafeArea()
-            
+
             ScrollView {
                 VStack(spacing: 40) {
                     // Header
                     HStack {
-                        Text("⚙️ Settings")
+                        Text("Settings")
                             .font(.system(size: 56, weight: .bold))
                             .foregroundColor(.white)
                         Spacer()
                     }
                     .padding(.horizontal, 48)
                     .padding(.top, 40)
-                    
+
+                    // Server section
+                    SettingsSection(title: "Server") {
+                        SettingsRow(
+                            icon: "server.rack",
+                            title: "API URL",
+                            value: apiClient.baseURL
+                        )
+                    }
+
                     // Account section
                     SettingsSection(title: "Account") {
                         if let user = supabase.currentUser {
@@ -41,7 +51,7 @@ struct SettingsView: View {
                                 title: "Email",
                                 value: user.email ?? "No email"
                             )
-                            
+
                             Button {
                                 showSignOutAlert = true
                             } label: {
@@ -57,9 +67,14 @@ struct SettingsView: View {
                                 .background(Color.white.opacity(0.05))
                                 .cornerRadius(12)
                             }
+                        } else {
+                            Text("Not signed in")
+                                .font(.body)
+                                .foregroundColor(.white.opacity(0.5))
+                                .padding(20)
                         }
                     }
-                    
+
                     // Devices section
                     SettingsSection(title: "Connected Devices") {
                         if pairingService.connectedDevices.isEmpty {
@@ -185,6 +200,6 @@ struct SettingsRow: View {
 
 #Preview {
     SettingsView()
-        .environmentObject(SupabaseClient.shared)
+        .environmentObject(AppSupabaseClient.shared)
         .environmentObject(DevicePairingService())
 }

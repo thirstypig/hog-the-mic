@@ -10,28 +10,28 @@ import Combine
 
 @MainActor
 final class SongBrowserViewModel: ObservableObject {
-    
+
     // MARK: - Published Properties
-    
+
     @Published var songs: [Song] = []
     @Published var filteredSongs: [Song] = []
     @Published var searchQuery: String = ""
     @Published var selectedGenre: String?
     @Published var isLoading = false
     @Published var error: Error?
-    
-    @Published var sortOption: SortOption = .popularity
-    
+
+    @Published var sortOption: SortOption = .playCount
+
     enum SortOption: String, CaseIterable {
-        case popularity = "Popularity"
+        case playCount = "Most Played"
         case titleAZ = "Title (A-Z)"
         case titleZA = "Title (Z-A)"
         case artist = "Artist"
         case newest = "Newest"
-        
+
         var systemImage: String {
             switch self {
-            case .popularity: return "star.fill"
+            case .playCount: return "star.fill"
             case .titleAZ: return "textformat.abc"
             case .titleZA: return "textformat.abc"
             case .artist: return "person.fill"
@@ -39,36 +39,36 @@ final class SongBrowserViewModel: ObservableObject {
             }
         }
     }
-    
+
     // MARK: - Private Properties
-    
-    private let supabase = SupabaseClient.shared
+
+    private let api = APIClient.shared
     private var cancellables = Set<AnyCancellable>()
-    
+
     // MARK: - Available Genres
-    
+
     var availableGenres: [String] {
-        let genres = Set(songs.compactMap { $0.genre })
+        let genres = Set(songs.map { $0.genre })
         return Array(genres).sorted()
     }
-    
+
     // MARK: - Initialization
-    
+
     init() {
         setupSearchObserver()
         Task {
             await loadSongs()
         }
     }
-    
+
     // MARK: - Public Methods
-    
+
     func loadSongs() async {
         isLoading = true
         error = nil
-        
+
         do {
-            songs = try await supabase.fetchSongs(limit: 100)
+            songs = try await api.fetchSongs()
             applyFiltersAndSort()
             isLoading = false
         } catch {
@@ -76,74 +76,40 @@ final class SongBrowserViewModel: ObservableObject {
             isLoading = false
         }
     }
-    
-    func searchSongs() async {
-        guard !searchQuery.isEmpty else {
-            applyFiltersAndSort()
-            return
-        }
-        
-        isLoading = true
-        
-        do {
-            let results = try await supabase.searchSongs(query: searchQuery, limit: 50)
-            filteredSongs = results
-            isLoading = false
-        } catch {
-            self.error = error
-            isLoading = false
-        }
-    }
-    
+
     func selectGenre(_ genre: String?) {
         selectedGenre = genre
         applyFiltersAndSort()
     }
-    
+
     func changeSortOption(_ option: SortOption) {
         sortOption = option
         applyFiltersAndSort()
     }
-    
+
     func refresh() async {
         await loadSongs()
     }
-    
-    func toggleFavorite(song: Song) async {
-        // Check if already favorited
-        do {
-            let favorites = try await supabase.fetchFavorites()
-            if favorites.contains(where: { $0.id == song.id }) {
-                try await supabase.removeFavorite(songId: song.id)
-            } else {
-                try await supabase.addFavorite(songId: song.id)
-            }
-        } catch {
-            self.error = error
-        }
-    }
-    
+
     // MARK: - Private Methods
-    
+
     private func setupSearchObserver() {
         $searchQuery
-            .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
+            .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
             .sink { [weak self] _ in
-                Task {
-                    await self?.searchSongs()
-                }
+                self?.applyFiltersAndSort()
             }
             .store(in: &cancellables)
     }
-    
+
     private func applyFiltersAndSort() {
         var result = songs
-        
+
         // Apply genre filter
         if let genre = selectedGenre {
             result = result.filter { $0.genre == genre }
         }
-        
+
         // Apply search filter (local)
         if !searchQuery.isEmpty {
             result = result.filter {
@@ -151,11 +117,11 @@ final class SongBrowserViewModel: ObservableObject {
                 $0.artist.localizedCaseInsensitiveContains(searchQuery)
             }
         }
-        
+
         // Apply sorting
         switch sortOption {
-        case .popularity:
-            result.sort { ($0.popularity ?? 0) > ($1.popularity ?? 0) }
+        case .playCount:
+            result.sort { $0.playCount > $1.playCount }
         case .titleAZ:
             result.sort { $0.title.localizedCompare($1.title) == .orderedAscending }
         case .titleZA:
@@ -163,9 +129,9 @@ final class SongBrowserViewModel: ObservableObject {
         case .artist:
             result.sort { $0.artist.localizedCompare($1.artist) == .orderedAscending }
         case .newest:
-            result.sort { $0.createdAt > $1.createdAt }
+            result.sort { $0.year > $1.year }
         }
-        
+
         filteredSongs = result
     }
 }

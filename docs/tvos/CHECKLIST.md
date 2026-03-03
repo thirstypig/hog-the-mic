@@ -87,43 +87,24 @@
 ## 📋 Phase 2: Backend Integration (1-2 hours)
 
 ### Node.js Backend (YouTube URL Extraction)
-- [ ] Open your existing Node.js backend project
-- [ ] Install youtube-dl or yt-dlp package
-- [ ] Create endpoint: GET /api/youtube/stream/:videoId
-- [ ] Implement YouTube URL extraction logic
+- [x] Open your existing Node.js backend project
+- [x] Install @distube/ytdl-core package
+- [x] Create endpoint: GET /api/youtube/stream/:videoId
+- [x] Implement YouTube URL extraction logic (with in-memory caching)
 - [ ] Test endpoint with curl or Postman
 - [ ] Deploy to your hosting (Heroku, Railway, etc.)
 - [ ] Get backend URL (e.g., https://your-app.com)
-- [ ] Update YouTubePlayerService.swift with backend URL
+- [x] Update YouTubePlayerService.swift with backend URL (uses APIClient)
 - [ ] Rebuild tvOS app
 - [ ] Test video playback
 
-**Example Node.js endpoint:**
-```javascript
-app.get('/api/youtube/stream/:videoId', async (req, res) => {
-  const { videoId } = req.params;
-  try {
-    // Use ytdl-core or similar
-    const info = await ytdl.getInfo(videoId);
-    const format = ytdl.chooseFormat(info.formats, { quality: 'highest' });
-    res.json({ streamURL: format.url });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-```
-
 ### Test Core Features
 - [ ] Launch app
-- [ ] Should see authentication screen
-- [ ] Try signing up with test email
-- [ ] Check Supabase dashboard → Auth → Users
-- [ ] Should see new user created
-- [ ] App should now show song browser
-- [ ] Songs from sample data should appear
+- [ ] App should show song browser (no auth wall)
+- [ ] Songs from Express API should appear
 - [ ] Click on a song
 - [ ] Player screen should appear
-- [ ] Video should load (if backend working)
+- [ ] Video should load via stream endpoint
 - [ ] Lyrics should display and sync
 - [ ] Test +0.5s / -0.5s offset buttons
 - [ ] Back button should return to browser

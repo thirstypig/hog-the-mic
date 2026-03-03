@@ -7,213 +7,141 @@
 
 import Foundation
 import Supabase
+import Auth
 
-/// Centralized Supabase client for the app
+/// Alias to avoid naming conflict with our wrapper class
+private typealias SDKClient = Supabase.SupabaseClient
+
+/// Centralized Supabase client for the app.
+/// Works in two modes:
+/// - With Supabase credentials: full auth + favorites support
+/// - Without credentials: app runs in server-only mode (songs from Express API)
 @MainActor
-final class SupabaseClient: ObservableObject {
-    static let shared = SupabaseClient()
-    
-    private(set) var client: Supabase.Client!
-    
+final class AppSupabaseClient: ObservableObject {
+    static let shared = AppSupabaseClient()
+
+    private var client: SDKClient?
+
     @Published var isAuthenticated = false
-    @Published var currentUser: User?
-    
+    @Published var currentUser: Auth.User?
+
+    /// Whether Supabase is configured and available
+    var isConfigured: Bool { client != nil }
+
     private init() {
-        // Configure with your Supabase project credentials
-        guard let supabaseURL = URL(string: Configuration.supabaseURL),
-              let supabaseKey = Configuration.supabaseAnonKey else {
-            fatalError("Supabase configuration is missing. Please set SUPABASE_URL and SUPABASE_ANON_KEY")
+        let url = Configuration.supabaseURL
+        let key = Configuration.supabaseAnonKey
+
+        guard !url.isEmpty, !key.isEmpty, let supabaseURL = URL(string: url) else {
+            print("[SupabaseClient] No Supabase credentials configured. Running in server-only mode.")
+            return
         }
-        
-        client = Supabase.Client(
+
+        client = SDKClient(
             supabaseURL: supabaseURL,
-            supabaseKey: supabaseKey,
+            supabaseKey: key,
             options: SupabaseClientOptions(
-                db: SupabaseClientOptions.DatabaseOptions(
-                    schema: "public"
-                ),
-                auth: SupabaseClientOptions.AuthOptions(
-                    autoRefreshToken: true,
-                    persistSession: true
-                )
+                db: .init(schema: "public"),
+                auth: .init(autoRefreshToken: true)
             )
         )
-        
-        // Listen for auth state changes
+
         Task {
             await observeAuthChanges()
         }
     }
-    
+
     private func observeAuthChanges() async {
-        for await state in await client.auth.authStateChanges {
-            switch state {
-            case .signedIn(let session):
-                self.isAuthenticated = true
-                self.currentUser = session.user
-                
+        guard let client else { return }
+
+        for await (event, session) in client.auth.authStateChanges {
+            switch event {
+            case .signedIn, .tokenRefreshed, .initialSession:
+                self.isAuthenticated = session != nil
+                self.currentUser = session?.user
             case .signedOut:
                 self.isAuthenticated = false
                 self.currentUser = nil
-                
-            case .userUpdated(let session):
-                self.currentUser = session.user
-                
-            default:
+            case .userUpdated:
+                self.currentUser = session?.user
+            @unknown default:
                 break
             }
         }
     }
-    
+
     // MARK: - Authentication
-    
+
     func signUp(email: String, password: String) async throws {
+        guard let client else { throw SupabaseError.notConfigured }
         try await client.auth.signUp(email: email, password: password)
     }
-    
+
     func signIn(email: String, password: String) async throws {
+        guard let client else { throw SupabaseError.notConfigured }
         try await client.auth.signIn(email: email, password: password)
     }
-    
+
     func signInWithApple() async throws {
-        // Implement Sign in with Apple
-        // This requires additional setup with Apple Developer account
         throw SupabaseError.notImplemented
     }
-    
+
     func signOut() async throws {
+        guard let client else { throw SupabaseError.notConfigured }
         try await client.auth.signOut()
     }
-    
+
     func resetPassword(email: String) async throws {
+        guard let client else { throw SupabaseError.notConfigured }
         try await client.auth.resetPasswordForEmail(email)
     }
-    
-    // MARK: - Database Operations
-    
-    func fetchSongs(limit: Int = 50, offset: Int = 0) async throws -> [Song] {
-        let response: [Song] = try await client.database
-            .from(Song.tableName)
-            .select()
-            .limit(limit)
-            .offset(offset)
-            .order("popularity", ascending: false)
-            .execute()
-            .value
-        
-        return response
-    }
-    
-    func searchSongs(query: String, limit: Int = 50) async throws -> [Song] {
-        let response: [Song] = try await client.database
-            .from(Song.tableName)
-            .select()
-            .or("title.ilike.%\(query)%,artist.ilike.%\(query)%")
-            .limit(limit)
-            .execute()
-            .value
-        
-        return response
-    }
-    
-    func fetchSong(id: UUID) async throws -> Song? {
-        let response: Song? = try await client.database
-            .from(Song.tableName)
-            .select()
-            .eq("id", value: id.uuidString)
-            .single()
-            .execute()
-            .value
-        
-        return response
-    }
-    
-    func insertSong(_ song: Song) async throws {
-        try await client.database
-            .from(Song.tableName)
-            .insert(song)
-            .execute()
-    }
-    
-    func updateSong(_ song: Song) async throws {
-        try await client.database
-            .from(Song.tableName)
-            .update(song)
-            .eq("id", value: song.id.uuidString)
-            .execute()
-    }
-    
-    func deleteSong(id: UUID) async throws {
-        try await client.database
-            .from(Song.tableName)
-            .delete()
-            .eq("id", value: id.uuidString)
-            .execute()
-    }
-    
+
     // MARK: - User Favorites
-    
+
     func fetchFavorites() async throws -> [Song] {
+        guard let client else { throw SupabaseError.notConfigured }
         guard let userId = currentUser?.id else {
             throw SupabaseError.notAuthenticated
         }
-        
-        let response: [Song] = try await client.database
+
+        let response: [Song] = try await client
             .from("user_favorites")
             .select("*, songs(*)")
             .eq("user_id", value: userId.uuidString)
             .execute()
             .value
-        
+
         return response
     }
-    
-    func addFavorite(songId: UUID) async throws {
+
+    func addFavorite(songId: String) async throws {
+        guard let client else { throw SupabaseError.notConfigured }
         guard let userId = currentUser?.id else {
             throw SupabaseError.notAuthenticated
         }
-        
-        try await client.database
+
+        try await client
             .from("user_favorites")
             .insert([
                 "user_id": userId.uuidString,
-                "song_id": songId.uuidString,
+                "song_id": songId,
                 "created_at": ISO8601DateFormatter().string(from: Date())
             ])
             .execute()
     }
-    
-    func removeFavorite(songId: UUID) async throws {
+
+    func removeFavorite(songId: String) async throws {
+        guard let client else { throw SupabaseError.notConfigured }
         guard let userId = currentUser?.id else {
             throw SupabaseError.notAuthenticated
         }
-        
-        try await client.database
+
+        try await client
             .from("user_favorites")
             .delete()
             .eq("user_id", value: userId.uuidString)
-            .eq("song_id", value: songId.uuidString)
+            .eq("song_id", value: songId)
             .execute()
-    }
-    
-    // MARK: - Real-time Subscriptions
-    
-    func subscribeToSongUpdates(onChange: @escaping (Song) -> Void) async throws -> RealtimeChannel {
-        let channel = await client.realtime.channel("songs")
-        
-        await channel.on(.postgresChanges(
-            event: .all,
-            schema: "public",
-            table: Song.tableName
-        )) { message in
-            // Handle real-time updates
-            if let song = Song(from: message.payload) {
-                onChange(song)
-            }
-        }
-        
-        try await channel.subscribe()
-        return channel
     }
 }
 
@@ -221,12 +149,10 @@ final class SupabaseClient: ObservableObject {
 
 private enum Configuration {
     static var supabaseURL: String {
-        // In production, read from Info.plist or environment
         ProcessInfo.processInfo.environment["SUPABASE_URL"] ?? ""
     }
-    
+
     static var supabaseAnonKey: String {
-        // In production, read from Info.plist or environment
         ProcessInfo.processInfo.environment["SUPABASE_ANON_KEY"] ?? ""
     }
 }
@@ -235,14 +161,17 @@ private enum Configuration {
 
 enum SupabaseError: LocalizedError {
     case notAuthenticated
+    case notConfigured
     case notImplemented
     case networkError
     case decodingError
-    
+
     var errorDescription: String? {
         switch self {
         case .notAuthenticated:
             return "User is not authenticated"
+        case .notConfigured:
+            return "Supabase is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY."
         case .notImplemented:
             return "Feature not yet implemented"
         case .networkError:

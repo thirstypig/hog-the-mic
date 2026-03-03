@@ -8,6 +8,7 @@
 import Foundation
 import CoreImage
 import SwiftUI
+import UIKit
 import Network
 
 /// Service that manages device pairing and connections
@@ -34,9 +35,8 @@ final class DevicePairingService: ObservableObject {
         setupNotifications()
     }
     
-    deinit {
-        stopListening()
-    }
+    // Note: stopListening() should be called explicitly before deallocation.
+    // deinit can't call MainActor-isolated methods.
     
     // MARK: - Public Methods (tvOS)
     
@@ -64,18 +64,21 @@ final class DevicePairingService: ObservableObject {
     func stopListening() {
         listener?.cancel()
         listener = nil
-        webSocketServer?.stop()
+        if let server = webSocketServer {
+            Task { await server.stop() }
+        }
         webSocketServer = nil
         isListening = false
         sessionId = nil
         qrCodeImage = nil
     }
-    
+
     /// Disconnect a specific device
     func disconnectDevice(_ device: ConnectedDevice) {
         connectedDevices.removeAll { $0.id == device.id }
-        // Send disconnect message via WebSocket
-        webSocketServer?.disconnectClient(deviceId: device.id)
+        if let server = webSocketServer {
+            Task { await server.disconnectClient(deviceId: device.id) }
+        }
     }
     
     // MARK: - Public Methods (iOS)
@@ -141,8 +144,8 @@ final class DevicePairingService: ObservableObject {
     
     /// Send audio data to connected tvOS device (iOS only)
     func sendAudioData(_ data: Data) async throws {
-        // Send via WebSocket
-        webSocketServer?.broadcast(message: .audioData(data))
+        guard let server = webSocketServer else { return }
+        await server.broadcast(message: .audioData(data))
     }
     
     // MARK: - Private Methods

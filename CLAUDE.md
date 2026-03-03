@@ -39,7 +39,7 @@ Both server and mobile use isolated feature modules under `features/`. Each feat
 - Server features: `*.routes.ts`, `*.storage.ts`, types
 - Mobile features: `components/`, `hooks/`, `types/`, `utils/`
 
-Server features: auth, search, songs, playlist, scoring, vocal-separation
+Server features: auth, search, songs, playlist, scoring, vocal-separation, streaming
 Mobile features: auth, library, player, playlist, scoring, search, vocal-separation
 
 ## Path Aliases
