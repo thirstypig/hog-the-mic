@@ -1,4 +1,7 @@
-import ytdl from "@distube/ytdl-core";
+import { execFile } from "child_process";
+import { promisify } from "util";
+
+const execFileAsync = promisify(execFile);
 
 export interface StreamInfo {
   url: string;
@@ -21,7 +24,7 @@ function cleanExpired() {
 }
 
 /**
- * Extract a playable stream URL for a YouTube video.
+ * Extract a playable stream URL for a YouTube video using yt-dlp.
  * Prefers combined (video+audio) mp4 formats for AVPlayer compatibility.
  */
 export async function getStreamInfo(videoId: string): Promise<StreamInfo> {
@@ -33,58 +36,60 @@ export async function getStreamInfo(videoId: string): Promise<StreamInfo> {
   }
 
   const url = `https://www.youtube.com/watch?v=${videoId}`;
-  const info = await ytdl.getInfo(url);
 
-  // Prefer combined formats (video+audio in one stream) for AVPlayer
-  // AVPlayer handles mp4 best; fall back to highest quality available
-  // Filter strictly: must have audio codec (not just hasAudio flag)
-  const hasRealAudio = (f: (typeof info.formats)[0]) =>
-    f.hasAudio && f.audioBitrate && f.audioBitrate > 0;
+  // Use yt-dlp to get the best combined mp4 stream URL
+  // -f: format selection — best mp4 with video+audio combined
+  // -g: print URL only
+  // -j: print JSON info (we use --print to get specific fields)
+  try {
+    // First try: best combined mp4
+    const { stdout } = await execFileAsync("yt-dlp", [
+      "-f", "best[ext=mp4]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best",
+      "--get-url",
+      "--no-warnings",
+      "--no-check-certificates",
+      url,
+    ], { timeout: 30000 });
 
-  const combinedFormats = info.formats.filter(
-    (f) => f.hasVideo && hasRealAudio(f) && f.container === "mp4"
-  );
+    const streamUrl = stdout.trim().split("\n")[0];
+    if (!streamUrl) {
+      throw new Error("yt-dlp returned empty URL");
+    }
 
-  let chosen = combinedFormats.sort(
-    (a, b) => (b.height ?? 0) - (a.height ?? 0)
-  )[0];
+    // Get format info for logging
+    let quality = "unknown";
+    try {
+      const { stdout: infoJson } = await execFileAsync("yt-dlp", [
+        "-f", "best[ext=mp4]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best",
+        "--dump-json",
+        "--no-warnings",
+        "--no-check-certificates",
+        url,
+      ], { timeout: 30000 });
 
-  // Last resort: any format with real audio
-  if (!chosen) {
-    chosen = info.formats
-      .filter((f) => f.hasVideo && hasRealAudio(f))
-      .sort((a, b) => (b.height ?? 0) - (a.height ?? 0))[0];
+      const info = JSON.parse(infoJson);
+      quality = info.resolution || info.format_note || `${info.height || "unknown"}p`;
+      console.log(
+        `[streaming] ${videoId}: yt-dlp selected format=${info.format_id} ${info.ext} ${quality} vcodec=${info.vcodec} acodec=${info.acodec}`
+      );
+    } catch {
+      // Non-critical — we already have the URL
+      console.log(`[streaming] ${videoId}: got URL, format info unavailable`);
+    }
+
+    const expiresAt = Date.now() + CACHE_TTL_MS;
+    const streamInfo: StreamInfo = {
+      url: streamUrl,
+      mimeType: "video/mp4",
+      quality,
+      expiresAt,
+    };
+
+    cache.set(videoId, { info: streamInfo, expiresAt });
+    return streamInfo;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[streaming] yt-dlp failed for ${videoId}:`, message);
+    throw new Error(`Failed to extract stream: ${message}`);
   }
-
-  if (!chosen || !chosen.url) {
-    console.error(
-      `[streaming] No playable format for ${videoId}. Available formats:`,
-      info.formats.map((f) => ({
-        itag: f.itag,
-        container: f.container,
-        hasVideo: f.hasVideo,
-        hasAudio: f.hasAudio,
-        audioBitrate: f.audioBitrate,
-        mimeType: f.mimeType,
-        quality: f.qualityLabel,
-      }))
-    );
-    throw new Error("No playable stream found for this video");
-  }
-
-  console.log(
-    `[streaming] ${videoId}: selected itag=${chosen.itag} ${chosen.container} ${chosen.qualityLabel ?? chosen.height + "p"} audio=${chosen.audioBitrate}kbps`
-  );
-
-  const expiresAt = Date.now() + CACHE_TTL_MS;
-  const streamInfo: StreamInfo = {
-    url: chosen.url,
-    mimeType: chosen.mimeType ?? "video/mp4",
-    quality: chosen.qualityLabel ?? `${chosen.height ?? "unknown"}p`,
-    expiresAt,
-  };
-
-  cache.set(videoId, { info: streamInfo, expiresAt });
-
-  return streamInfo;
 }
