@@ -1,10 +1,13 @@
 import { Server as SocketIOServer } from "socket.io";
 import type { Server } from "http";
+import { randomUUID } from "crypto";
 import { sessions } from "./pairing.routes";
 import type {
   ClientToServerEvents,
   ServerToClientEvents,
   SessionMember,
+  PairingSession,
+  QueueEntry,
 } from "./pairing.types";
 
 export function setupPairingSocket(httpServer: Server) {
@@ -76,6 +79,71 @@ export function setupPairingSocket(httpServer: Server) {
 
       // Broadcast current session state to everyone in the room
       emitSessionState(sessionId);
+
+      // Send current queue state to the newly joined client
+      emitQueueUpdated(sessionId);
+    });
+
+    // ── Queue events ─────────────────────────────────────────
+
+    socket.on("add_to_queue", (payload) => {
+      const info = socketSessionMap.get(socket.id);
+      if (!info) return;
+
+      const session = sessions.get(info.sessionId);
+      if (!session) return;
+
+      const entry: QueueEntry = {
+        queueId: randomUUID(),
+        songId: payload.songId,
+        videoId: payload.videoId,
+        title: payload.title,
+        artist: payload.artist,
+        thumbnailUrl: payload.thumbnailUrl,
+        addedBy: info.deviceName,
+        addedBySocketId: socket.id,
+        addedAt: Date.now(),
+      };
+
+      // If nothing playing and queue empty, start playing immediately
+      if (!session.currentlyPlaying && session.queue.length === 0) {
+        session.currentlyPlaying = entry;
+        pairing.to(`session:${info.sessionId}`).emit("play_song", {
+          sessionId: info.sessionId,
+          entry,
+        });
+      } else {
+        session.queue.push(entry);
+      }
+
+      emitQueueUpdated(info.sessionId);
+    });
+
+    socket.on("remove_from_queue", (payload) => {
+      const info = socketSessionMap.get(socket.id);
+      if (!info) return;
+
+      const session = sessions.get(info.sessionId);
+      if (!session) return;
+
+      session.queue = session.queue.filter(
+        (e) => e.queueId !== payload.queueId,
+      );
+      emitQueueUpdated(info.sessionId);
+    });
+
+    socket.on("skip_song", () => {
+      const info = socketSessionMap.get(socket.id);
+      if (!info) return;
+      advanceQueue(info.sessionId);
+    });
+
+    socket.on("song_finished", () => {
+      const info = socketSessionMap.get(socket.id);
+      if (!info) return;
+      // Only accept from TV role
+      if (info.role !== "tv") return;
+      advanceQueue(info.sessionId);
     });
 
     // ── Audio relay (Phase 2 prep — passthrough) ──────────────
@@ -166,5 +234,34 @@ export function setupPairingSocket(httpServer: Server) {
       singers,
       tvConnected,
     });
+  }
+
+  function emitQueueUpdated(sessionId: string) {
+    const session = sessions.get(sessionId);
+    if (!session) return;
+
+    pairing.to(`session:${sessionId}`).emit("queue_updated", {
+      sessionId,
+      currentlyPlaying: session.currentlyPlaying,
+      upcoming: session.queue,
+    });
+  }
+
+  function advanceQueue(sessionId: string) {
+    const session = sessions.get(sessionId);
+    if (!session) return;
+
+    if (session.queue.length > 0) {
+      const next = session.queue.shift()!;
+      session.currentlyPlaying = next;
+      pairing.to(`session:${sessionId}`).emit("play_song", {
+        sessionId,
+        entry: next,
+      });
+    } else {
+      session.currentlyPlaying = null;
+    }
+
+    emitQueueUpdated(sessionId);
   }
 }

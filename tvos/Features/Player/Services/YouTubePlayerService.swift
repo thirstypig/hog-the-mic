@@ -24,6 +24,7 @@ final class YouTubePlayerService: ObservableObject {
     @Published var isLoading = false
     @Published var error: PlayerError?
     @Published var rate: Float = 1.0
+    @Published var didFinishPlaying = false
 
     // MARK: - Private Properties
 
@@ -31,6 +32,7 @@ final class YouTubePlayerService: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var statusObservation: NSKeyValueObservation?
     private var currentVideoId: String?
+    private var endOfPlayObserver: NSObjectProtocol?
 
     // MARK: - Public Methods
 
@@ -67,7 +69,9 @@ final class YouTubePlayerService: ObservableObject {
             }
 
             self.player = newPlayer
+            self.didFinishPlaying = false
             setupTimeObserver()
+            setupEndOfPlayObserver(for: playerItem)
 
         } catch let playerError as PlayerError {
             self.error = playerError
@@ -140,10 +144,32 @@ final class YouTubePlayerService: ObservableObject {
         }
     }
 
+    private func setupEndOfPlayObserver(for item: AVPlayerItem) {
+        // Remove previous observer if any
+        if let obs = endOfPlayObserver {
+            NotificationCenter.default.removeObserver(obs)
+        }
+
+        endOfPlayObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime,
+            object: item,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.isPlaying = false
+                self?.didFinishPlaying = true
+            }
+        }
+    }
+
     private func cleanup() {
         if let observer = timeObserver {
             player?.removeTimeObserver(observer)
             timeObserver = nil
+        }
+        if let obs = endOfPlayObserver {
+            NotificationCenter.default.removeObserver(obs)
+            endOfPlayObserver = nil
         }
         statusObservation?.invalidate()
         statusObservation = nil

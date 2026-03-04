@@ -4,7 +4,9 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useQuery } from "@tanstack/react-query";
 import { Music } from "lucide-react-native";
 import FocusableCard from "@common/components/FocusableCard";
+import { useToast } from "@common/hooks/use-toast";
 import { colors } from "@theme/colors";
+import { useQueue } from "@features/pairing";
 import type { Song } from "@shared/schema";
 import type { RootStackParamList } from "@navigation/types";
 
@@ -12,16 +14,36 @@ type Nav = NativeStackNavigationProp<RootStackParamList, "Home">;
 
 export default function HomeScreen() {
   const navigation = useNavigation<Nav>();
+  const { toast } = useToast();
+  const { addToQueue, currentlyPlaying, isPaired } = useQueue();
 
   const { data: songs = [], isLoading } = useQuery<Song[]>({
     queryKey: ["/api/songs"],
   });
 
+  const handleSongPress = (song: Song) => {
+    if (isPaired) {
+      addToQueue({
+        songId: song.id,
+        videoId: song.videoId,
+        title: song.title,
+        artist: song.artist,
+        thumbnailUrl: song.thumbnailUrl,
+      });
+      toast({
+        title: "Added to Queue",
+        description: `${song.title} by ${song.artist}`,
+      });
+    } else {
+      navigation.navigate("Player", { song });
+    }
+  };
+
   const renderSongCard = ({ item }: { item: Song }) => (
     <FocusableCard
       className="m-tv-1 p-0 overflow-hidden"
       style={{ width: 280 }}
-      onPress={() => navigation.navigate("Player", { song: item })}
+      onPress={() => handleSongPress(item)}
     >
       {item.thumbnailUrl ? (
         <Image
@@ -78,6 +100,20 @@ export default function HomeScreen() {
           </Text>
         </Pressable>
       </View>
+
+      {/* Now Playing bar (when paired) */}
+      {isPaired && currentlyPlaying && (
+        <Pressable
+          className="flex-row items-center p-3 bg-primary/10 rounded-lg mb-3 border border-primary/20"
+          onPress={() => navigation.navigate("Pair")}
+        >
+          <View className="w-2 h-2 rounded-full bg-green-500 mr-2" />
+          <Text className="text-foreground text-sm font-semibold flex-1" numberOfLines={1}>
+            Now Playing: {currentlyPlaying.title} - {currentlyPlaying.artist}
+          </Text>
+          <Text className="text-primary text-xs">View Queue</Text>
+        </Pressable>
+      )}
 
       {/* Song grid */}
       {isLoading ? (

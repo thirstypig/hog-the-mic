@@ -119,12 +119,16 @@ Mobile features: auth, library, player, playlist, scoring, search, vocal-separat
 - `tvos/Shared/Networking/APIClient.swift` — HTTP client for Express API
 - `tvos/Shared/Database/SupabaseClient.swift` — Supabase auth wrapper (`AppSupabaseClient`)
 - `tvos/Shared/Models/Song.swift` — Song model (matches server schema)
+- `tvos/Shared/Models/QueueEntry.swift` — Queue entry model for shared song queue
+- `tvos/Shared/Services/QueueService.swift` — Queue state management via Socket.IO
 - `tvos/Features/Player/` — Player view, view model, YouTube/lyrics services
+- `tvos/Features/Player/Views/QueuePlayerView.swift` — Queue-driven player with auto-advance
 - `tvos/Features/SongBrowser/` — Song browser view and view model
 - `tvos/Features/Pairing/` — QR code pairing view and socket.io service
-- `server/features/pairing/` — Pairing REST endpoints + Socket.IO namespace
-- `mobile/src/features/pairing/` — QR scanner, socket client, pairing hooks
-- `mobile/src/screens/PairScreen.tsx` — Pairing screen (QR scan + status)
+- `server/features/pairing/` — Pairing REST endpoints + Socket.IO namespace + queue logic
+- `server/features/streaming/` — YouTube stream URL extraction via yt-dlp
+- `mobile/src/features/pairing/` — QR scanner, socket client, pairing hooks, queue hook
+- `mobile/src/screens/PairScreen.tsx` — Pairing screen (QR scan + queue management when paired)
 
 ## Rules
 
@@ -147,14 +151,26 @@ Mobile features: auth, library, player, playlist, scoring, search, vocal-separat
 
 - tvOS app fetches songs from Express API via `APIClient` (not direct Supabase queries)
 - Supabase client on tvOS is auth-only: sign in/up, favorites (RLS)
-- YouTube streaming: server extracts playable URLs via `@distube/ytdl-core` → tvOS plays via AVPlayer
+- YouTube streaming: server extracts playable URLs via `yt-dlp` CLI → tvOS plays via AVPlayer
 - Data flow: tvOS → `GET /api/songs` → Express → Supabase PostgreSQL
-- Video flow: tvOS → `GET /api/youtube/stream/:videoId` → Express → ytdl-core → direct YouTube CDN URL → AVPlayer
+- Video flow: tvOS → `GET /api/youtube/stream/:videoId` → Express → yt-dlp → YouTube CDN URL → AVPlayer
 - Lyrics come embedded in the song record from the server (fetched from LRCLIB at song creation time)
 - Stream URLs are cached server-side for 4 hours (they expire after ~6 hours)
 - AVAudioSession configured at app init with `.playback` category for reliable audio
 - Bundle ID: `com.ktvsinger.tvos`, deployment target: tvOS 17.0
 - SPM dependency: `supabase-swift` v2.0.0+
+- PlayerView uses GeometryReader for responsive layout (proportional sizing, not hardcoded pixels)
+- QueuePlayerView auto-advances through songs when queue is active
+
+## Song Queue Architecture
+
+- **Server**: Queue state stored on PairingSession (in-memory, ephemeral). Socket.IO events manage the queue lifecycle.
+- **Queue flow**: Phone adds song → server checks if queue empty → auto-plays first song or appends to queue → broadcasts state to all devices
+- **Auto-advance**: When TV reports `song_finished`, server shifts next song from queue and emits `play_song`
+- **Socket.IO events (queue)**: `add_to_queue`, `remove_from_queue`, `skip_song`, `song_finished` (client→server); `queue_updated`, `play_song` (server→client)
+- **tvOS**: QueueService observes socket events, QueuePlayerView loads songs from API and auto-advances. Opens as fullScreenCover when queue starts.
+- **Mobile**: useQueue hook provides `currentlyPlaying`, `upcoming`, `addToQueue()`, `removeFromQueue()`, `skipSong()`. HomeScreen/SearchScreen add to queue when paired.
+- **Design principle**: tvOS = clean video + lyrics display only. All search, queue management, and song discovery happens on the mobile device.
 
 ## Device Pairing Architecture
 
@@ -164,6 +180,15 @@ Mobile features: auth, library, player, playlist, scoring, search, vocal-separat
 - **Flow**: TV creates session → shows QR → phone scans QR → both connect to Socket.IO room → real-time roster sync
 - **Socket.IO events**: `join_session`, `singer_joined`, `singer_left`, `session_state`, `audio_chunk` (Phase 2 stub), `score_update` (Phase 3 stub)
 - **Dependencies**: `socket.io` (server), `socket.io-client` (mobile), `socket.io-client-swift` (tvOS via SPM)
+- **Reconnection**: tvOS SocketPairingService uses unlimited reconnect attempts and re-joins session on reconnect
+
+## YouTube Streaming (yt-dlp)
+
+- **Requires**: `yt-dlp` installed on the host machine (`brew install yt-dlp`)
+- **How it works**: Server shells out to `yt-dlp` via `child_process.execFile()` to extract direct playable URLs
+- **Format selection**: `best[ext=mp4]` for combined video+audio mp4 (AVPlayer compatible)
+- **Caching**: 4-hour TTL in-memory cache (YouTube URLs expire ~6 hours)
+- **Replaced**: `@distube/ytdl-core` (archived Aug 2025, stopped working)
 
 ## Mobile iOS Build
 
@@ -176,6 +201,6 @@ Mobile features: auth, library, player, playlist, scoring, search, vocal-separat
 ## Known Issues
 
 - `npm run check:server` references nonexistent `tsconfig.server.json` — use `npx tsc --noEmit` instead
-- Audio dropout during playback mitigated: added AVAudioSession `.playback` category + stricter format selection (`audioBitrate > 0` check). Monitor server logs for `[streaming]` format info.
 - Free Apple Developer account: apps on real device expire after 7 days, need re-deploy
 - tvOS `.onTapGesture` doesn't work with Siri Remote — always use `Button` for selectable elements
+- `yt-dlp` must be installed on the server host — streaming will fail without it

@@ -27,7 +27,7 @@ final class SocketPairingService: ObservableObject {
 
     private var manager: SocketManager?
     private var socket: SocketIOClient?
-    private var currentSessionId: String?
+    private(set) var currentSessionId: String?
 
     // MARK: - Public API
 
@@ -45,7 +45,7 @@ final class SocketPairingService: ObservableObject {
         manager = SocketManager(socketURL: url, config: [
             .forceWebsockets(true),
             .reconnects(true),
-            .reconnectAttempts(5),
+            .reconnectAttempts(-1),
             .reconnectWait(1),
             .log(false)
         ])
@@ -62,6 +62,18 @@ final class SocketPairingService: ObservableObject {
                 // Join the session as TV
                 socket.emit("join_session", [
                     "sessionId": sessionId,
+                    "role": "tv",
+                    "deviceName": "Apple TV"
+                ])
+            }
+        }
+
+        socket.on(clientEvent: .reconnect) { [weak self] _, _ in
+            Task { @MainActor in
+                guard let self = self, let sid = self.currentSessionId else { return }
+                // Re-join the session room after reconnect
+                socket.emit("join_session", [
+                    "sessionId": sid,
                     "role": "tv",
                     "deviceName": "Apple TV"
                 ])
@@ -130,6 +142,23 @@ final class SocketPairingService: ObservableObject {
         }
 
         socket.connect()
+    }
+
+    /// Emit an event on the socket
+    func emit(_ event: String, _ items: [Any]) {
+        socket?.emit(event, items)
+    }
+
+    /// Emit an event with a single dictionary payload
+    func emit(_ event: String, _ payload: [String: Any]) {
+        socket?.emit(event, payload)
+    }
+
+    /// Register a handler for a custom event
+    func on(_ event: String, callback: @escaping ([Any]) -> Void) {
+        socket?.on(event) { data, _ in
+            callback(data)
+        }
     }
 
     /// Disconnect from the server

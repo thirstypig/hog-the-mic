@@ -1,28 +1,43 @@
 //
-//  PlayerView.swift
+//  QueuePlayerView.swift
 //  KTVSinger-tvOS
 //
-//  Main player view with video and synchronized lyrics
-//  Ported from React Native PlayerScreen.tsx
+//  Queue-driven player that auto-advances through songs.
+//  Presented as fullScreenCover when queue starts playing.
 //
 
 import SwiftUI
 import AVKit
 
-struct PlayerView: View {
+struct QueuePlayerView: View {
+    @EnvironmentObject var queueService: QueueService
     @StateObject private var viewModel: PlayerViewModel
     @Environment(\.dismiss) private var dismiss
     @FocusState private var focusedControl: FocusableControl?
 
-    init(song: Song) {
+    init(initialEntry: QueueEntry) {
+        let song = Song(
+            id: initialEntry.songId,
+            videoId: initialEntry.videoId,
+            title: initialEntry.title,
+            artist: initialEntry.artist,
+            thumbnailUrl: initialEntry.thumbnailUrl,
+            genre: "Unknown",
+            gender: "unknown",
+            year: 0,
+            lyrics: [],
+            playCount: 0,
+            instrumentalUrl: nil,
+            lyricsOffset: 0
+        )
         _viewModel = StateObject(wrappedValue: PlayerViewModel(song: song))
     }
 
     enum FocusableControl {
         case back
+        case skip
         case decreaseOffset
         case increaseOffset
-        case playPause
         case retry
     }
 
@@ -35,19 +50,15 @@ struct PlayerView: View {
                 Color.black.ignoresSafeArea()
 
                 VStack(spacing: 0) {
-                    // Top bar with controls
                     topBar
                         .padding(.horizontal, w * 0.025)
                         .padding(.vertical, h * 0.022)
 
-                    // Main content: Video + Lyrics side-by-side
                     HStack(spacing: 0) {
-                        // Video player
                         videoPlayer
                             .frame(maxWidth: .infinity)
                             .aspectRatio(16/9, contentMode: .fit)
 
-                        // Lyrics panel
                         lyricsPanel(screenWidth: w, screenHeight: h)
                             .frame(width: w * 0.35)
                     }
@@ -55,13 +66,26 @@ struct PlayerView: View {
             }
         }
         .persistentSystemOverlays(.hidden)
+        .onAppear {
+            // Attach queue service and load the actual song
+            viewModel.attachQueueService(queueService)
+            Task {
+                await viewModel.loadSongFromAPI()
+            }
+        }
+        .onChange(of: queueService.currentlyPlaying) { _, newValue in
+            if newValue == nil {
+                // Queue is empty, dismiss player
+                viewModel.stop()
+                dismiss()
+            }
+        }
     }
 
     // MARK: - Top Bar
 
     private var topBar: some View {
         HStack(spacing: 20) {
-            // Back button
             Button {
                 viewModel.stop()
                 dismiss()
@@ -80,7 +104,6 @@ struct PlayerView: View {
             }
             .focused($focusedControl, equals: .back)
 
-            // Song info
             VStack(alignment: .leading, spacing: 4) {
                 Text(viewModel.song.title)
                     .font(.title2)
@@ -96,6 +119,36 @@ struct PlayerView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
 
             Spacer()
+
+            // Up Next indicator
+            if let next = queueService.upcoming.first {
+                HStack(spacing: 8) {
+                    Text("Up Next:")
+                        .font(.body)
+                        .foregroundColor(.white.opacity(0.5))
+                    Text("\(next.title) - \(next.artist)")
+                        .font(.body)
+                        .foregroundColor(.white.opacity(0.7))
+                        .lineLimit(1)
+                }
+            }
+
+            // Skip button
+            Button {
+                viewModel.skipSong()
+            } label: {
+                HStack {
+                    Image(systemName: "forward.fill")
+                    Text("Skip")
+                }
+                .font(.body)
+                .foregroundColor(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(Color.white.opacity(0.2))
+                .cornerRadius(8)
+            }
+            .focused($focusedControl, equals: .skip)
 
             // Lyrics offset controls
             HStack(spacing: 16) {
@@ -218,7 +271,6 @@ struct PlayerView: View {
         return ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
-                    // Top padding for centering
                     Color.clear.frame(height: topPad)
 
                     if viewModel.song.lyrics.isEmpty {
@@ -227,7 +279,6 @@ struct PlayerView: View {
                         lyricsContent(activeFontSize: activeFontSize, inactiveFontSize: inactiveFontSize)
                     }
 
-                    // Bottom padding
                     Color.clear.frame(height: bottomPad)
                 }
                 .padding(.horizontal, hPad)
@@ -281,10 +332,4 @@ struct PlayerView: View {
             return .white.opacity(0.6)
         }
     }
-}
-
-// MARK: - Preview
-
-#Preview {
-    PlayerView(song: .preview)
 }

@@ -105,37 +105,59 @@ export async function searchLRCLibDatabase(query: string): Promise<LRCLibSearchR
         duration: song.duration,
       }));
 
-    // If query is a single word, prioritize single-word matches
+    // Smart ranking for search results
+    const queryLower = query.trim().toLowerCase();
     const queryWords = query.trim().split(/\s+/);
-    if (queryWords.length === 1) {
-      const searchWord = queryWords[0].toLowerCase();
+    const isShortQuery = queryLower.length <= 3;
 
-      songsWithSyncedLyrics.sort((a, b) => {
-        const aTitle = a.trackName.toLowerCase();
-        const bTitle = b.trackName.toLowerCase();
+    songsWithSyncedLyrics.sort((a, b) => {
+      let aScore = 0;
+      let bScore = 0;
+
+      const aTitle = a.trackName.toLowerCase();
+      const bTitle = b.trackName.toLowerCase();
+      const aArtist = a.artistName.toLowerCase();
+      const bArtist = b.artistName.toLowerCase();
+      const aPrimaryArtist = a.artistName.split(/\s*(?:feat\.?|ft\.?|featuring|,|&)\s*/i)[0].toLowerCase().trim();
+      const bPrimaryArtist = b.artistName.split(/\s*(?:feat\.?|ft\.?|featuring|,|&)\s*/i)[0].toLowerCase().trim();
+
+      // For short queries (like "U2"), heavily boost artist matches
+      if (isShortQuery) {
+        // Exact artist name match
+        if (aPrimaryArtist === queryLower) aScore += 5000;
+        if (bPrimaryArtist === queryLower) bScore += 5000;
+
+        // Artist name starts with query
+        if (aPrimaryArtist.startsWith(queryLower)) aScore += 3000;
+        if (bPrimaryArtist.startsWith(queryLower)) bScore += 3000;
+
+        // Full artist field contains query
+        if (aArtist.includes(queryLower)) aScore += 1000;
+        if (bArtist.includes(queryLower)) bScore += 1000;
+      }
+
+      // Exact title match
+      if (aTitle === queryLower) aScore += 2000;
+      if (bTitle === queryLower) bScore += 2000;
+
+      // Title starts with query
+      if (aTitle.startsWith(queryLower)) aScore += 800;
+      if (bTitle.startsWith(queryLower)) bScore += 800;
+
+      // For single-word queries, prefer single-word titles
+      if (queryWords.length === 1) {
         const aWords = a.trackName.trim().split(/\s+/).length;
         const bWords = b.trackName.trim().split(/\s+/).length;
+        if (aWords === 1) aScore += 500;
+        if (bWords === 1) bScore += 500;
+        // Prefer shorter titles
+        aScore -= aWords * 10;
+        bScore -= bWords * 10;
+      }
 
-        // Exact match gets highest priority
-        if (aTitle === searchWord && bTitle !== searchWord) return -1;
-        if (bTitle === searchWord && aTitle !== searchWord) return 1;
-
-        // Single-word titles get priority over multi-word
-        if (aWords === 1 && bWords > 1) return -1;
-        if (bWords === 1 && aWords > 1) return 1;
-
-        // For single-word titles, sort alphabetically
-        if (aWords === 1 && bWords === 1) {
-          return aTitle.localeCompare(bTitle);
-        }
-
-        // Otherwise, prefer shorter titles (fewer words)
-        if (aWords !== bWords) return aWords - bWords;
-
-        // Finally, sort alphabetically
-        return aTitle.localeCompare(bTitle);
-      });
-    }
+      if (aScore !== bScore) return bScore - aScore;
+      return aTitle.localeCompare(bTitle);
+    });
 
     return songsWithSyncedLyrics;
   } catch (error) {

@@ -3,6 +3,8 @@ export interface PairingSession {
   id: string;
   createdAt: number;
   members: Map<string, SessionMember>;
+  queue: QueueEntry[];
+  currentlyPlaying: QueueEntry | null;
 }
 
 export interface SessionMember {
@@ -10,6 +12,43 @@ export interface SessionMember {
   role: "tv" | "singer";
   deviceName: string;
   joinedAt: number;
+}
+
+// ── Queue types ────────────────────────────────────────────────
+
+export interface QueueEntry {
+  queueId: string;
+  songId: string;
+  videoId: string;
+  title: string;
+  artist: string;
+  thumbnailUrl: string | null;
+  addedBy: string;
+  addedBySocketId: string;
+  addedAt: number;
+}
+
+export interface QueueStatePayload {
+  sessionId: string;
+  currentlyPlaying: QueueEntry | null;
+  upcoming: QueueEntry[];
+}
+
+export interface PlaySongPayload {
+  sessionId: string;
+  entry: QueueEntry;
+}
+
+export interface AddToQueuePayload {
+  songId: string;
+  videoId: string;
+  title: string;
+  artist: string;
+  thumbnailUrl: string | null;
+}
+
+export interface RemoveFromQueuePayload {
+  queueId: string;
 }
 
 // ── Socket.io event payloads ────────────────────────────────────
@@ -55,6 +94,10 @@ export interface ErrorPayload {
 
 export interface ClientToServerEvents {
   join_session: (payload: JoinSessionPayload) => void;
+  add_to_queue: (payload: AddToQueuePayload) => void;
+  remove_from_queue: (payload: RemoveFromQueuePayload) => void;
+  skip_song: () => void;
+  song_finished: () => void;
   audio_chunk: (data: Buffer) => void;
   audio_start: () => void;
   audio_stop: () => void;
@@ -67,6 +110,8 @@ export interface ServerToClientEvents {
   singer_joined: (payload: SingerJoinedPayload) => void;
   singer_left: (payload: SingerLeftPayload) => void;
   session_state: (payload: SessionStatePayload) => void;
+  queue_updated: (payload: QueueStatePayload) => void;
+  play_song: (payload: PlaySongPayload) => void;
   audio_chunk: (data: Buffer) => void;
   audio_start: (payload: { socketId: string }) => void;
   audio_stop: (payload: { socketId: string }) => void;
