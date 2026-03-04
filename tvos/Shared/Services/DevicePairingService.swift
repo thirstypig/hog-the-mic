@@ -33,7 +33,7 @@ final class DevicePairingService: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
 
     init() {
-        // Sync socket singers → connectedDevices
+        // Sync socket singers -> connectedDevices
         socketService.$singers
             .map { singers in
                 singers.map { singer in
@@ -51,13 +51,24 @@ final class DevicePairingService: ObservableObject {
 
         socketService.$error
             .compactMap { msg in msg.map { PairingError.networkError($0) } }
-            .assign(to: &$error)
+            .sink { [weak self] pairingError in
+                guard let self = self else { return }
+                self.error = pairingError
+                // Auto-recreate session if "Session not found"
+                if case .networkError(let message) = pairingError,
+                   message.lowercased().contains("session not found") {
+                    Task { await self.createSession() }
+                }
+            }
+            .store(in: &cancellables)
     }
 
     // MARK: - Session Lifecycle
 
     /// Create a pairing session on the Express server, generate QR code, connect socket.io
     func createSession() async {
+        guard !isLoading else { return }
+
         isLoading = true
         error = nil
         qrCodeImage = nil

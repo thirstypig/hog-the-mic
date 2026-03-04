@@ -29,6 +29,8 @@ export function registerPairingRoutes(app: Express) {
       id,
       createdAt: Date.now(),
       members: new Map(),
+      queue: [],
+      currentlyPlaying: null,
     };
     sessions.set(id, session);
 

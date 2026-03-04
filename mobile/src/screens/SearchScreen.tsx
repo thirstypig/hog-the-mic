@@ -13,6 +13,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RouteProp } from "@react-navigation/native";
 import { Search, ArrowLeft } from "lucide-react-native";
 import { useSearch } from "@features/search";
+import { useQueue } from "@features/pairing";
 import { useToast } from "@common/hooks/use-toast";
 import { apiUrl } from "@common/lib/api";
 import { queryClient } from "@common/lib/queryClient";
@@ -31,6 +32,7 @@ export default function SearchScreen() {
   const initialQuery = route.params?.query;
   const { toast } = useToast();
   const [loadingId, setLoadingId] = useState<number | null>(null);
+  const { addToQueue, isPaired } = useQueue();
 
   const {
     lrclibResults,
@@ -114,20 +116,38 @@ export default function SearchScreen() {
       const video = await findYouTubeVideo(result.trackName, result.artistName);
 
       // If we can't find a video, use a search-based video ID
-      // YouTube embed supports playing the first result of a search
       const videoId = video?.videoId || `search:${result.trackName} ${result.artistName}`;
       const thumbnail = video?.thumbnail || "";
 
       // Step 2: Check if song already exists by video ID (only if we have a real ID)
+      let existingSong: Song | null = null;
       if (video?.videoId) {
         const existingRes = await fetch(apiUrl(`/api/songs/video/${video.videoId}`));
         if (existingRes.ok) {
-          const song: Song = await existingRes.json();
-          await fetch(apiUrl(`/api/songs/${song.id}/play`), { method: "POST" });
-          queryClient.invalidateQueries({ queryKey: ["/api/songs"] });
-          navigation.navigate("Player", { song });
-          return;
+          existingSong = await existingRes.json();
         }
+      }
+
+      if (existingSong) {
+        await fetch(apiUrl(`/api/songs/${existingSong.id}/play`), { method: "POST" });
+        queryClient.invalidateQueries({ queryKey: ["/api/songs"] });
+
+        if (isPaired) {
+          addToQueue({
+            songId: existingSong.id,
+            videoId: existingSong.videoId,
+            title: existingSong.title,
+            artist: existingSong.artist,
+            thumbnailUrl: existingSong.thumbnailUrl,
+          });
+          toast({
+            title: "Added to Queue",
+            description: `${existingSong.title} by ${existingSong.artist}`,
+          });
+        } else {
+          navigation.navigate("Player", { song: existingSong });
+        }
+        return;
       }
 
       // Step 3: Fetch lyrics from LRCLIB
@@ -169,7 +189,21 @@ export default function SearchScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/songs"] });
       await fetch(apiUrl(`/api/songs/${savedSong.id}/play`), { method: "POST" });
 
-      navigation.navigate("Player", { song: savedSong });
+      if (isPaired) {
+        addToQueue({
+          songId: savedSong.id,
+          videoId: savedSong.videoId,
+          title: savedSong.title,
+          artist: savedSong.artist,
+          thumbnailUrl: savedSong.thumbnailUrl,
+        });
+        toast({
+          title: "Added to Queue",
+          description: `${savedSong.title} by ${savedSong.artist}`,
+        });
+      } else {
+        navigation.navigate("Player", { song: savedSong });
+      }
     } catch (err) {
       console.error("handlePlayResult error:", err);
       toast({
@@ -220,6 +254,11 @@ export default function SearchScreen() {
           <ArrowLeft size={28} color={colors.foreground} />
         </Pressable>
         <Text className="text-tv-xl font-bold text-foreground">Search</Text>
+        {isPaired && (
+          <View className="ml-2 px-2 py-0.5 rounded bg-green-500/20">
+            <Text className="text-green-500 text-xs font-semibold">Paired</Text>
+          </View>
+        )}
       </View>
 
       {/* Search input */}

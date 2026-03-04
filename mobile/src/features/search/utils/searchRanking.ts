@@ -9,6 +9,7 @@ export function rankSearchResults(
   searchQuery: string,
 ): RankedResult[] {
   const queryLower = searchQuery.toLowerCase().trim();
+  const isShortQuery = queryLower.length <= 3;
 
   return results
     .map((result) => {
@@ -31,6 +32,13 @@ export function rankSearchResults(
       const isFeatured = /(?:feat\.?|ft\.?|featuring)/i.test(
         result.artistName,
       );
+
+      // Short query boost: heavily favor exact/starts-with artist matches
+      if (isShortQuery) {
+        if (primaryArtist === queryLower) score += 5000;
+        else if (primaryArtist.startsWith(queryLower)) score += 3000;
+        else if (fullArtist.includes(queryLower)) score += 1000;
+      }
 
       if (isPrimaryArtist) {
         score += 1000;

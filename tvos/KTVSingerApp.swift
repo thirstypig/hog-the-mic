@@ -12,6 +12,7 @@ import AVFoundation
 struct KTVSingerApp: App {
     @StateObject private var supabase = AppSupabaseClient.shared
     @StateObject private var pairingService = DevicePairingService()
+    @StateObject private var queueService = QueueService()
 
     init() {
         do {
@@ -28,13 +29,17 @@ struct KTVSingerApp: App {
             ContentView()
                 .environmentObject(supabase)
                 .environmentObject(pairingService)
+                .environmentObject(queueService)
         }
     }
 }
 
 struct ContentView: View {
     @EnvironmentObject var supabase: AppSupabaseClient
+    @EnvironmentObject var pairingService: DevicePairingService
+    @EnvironmentObject var queueService: QueueService
     @State private var showPairingSheet = false
+    @State private var showQueuePlayer = false
 
     var body: some View {
         ZStack {
@@ -63,13 +68,24 @@ struct ContentView: View {
                     Button {
                         showPairingSheet = true
                     } label: {
-                        Image(systemName: "iphone.and.arrow.forward")
-                            .font(.title)
-                            .foregroundColor(.white)
-                            .padding(20)
-                            .background(Color.blue)
-                            .clipShape(Circle())
-                            .shadow(radius: 10)
+                        HStack(spacing: 8) {
+                            Image(systemName: "iphone.and.arrow.forward")
+                                .font(.title)
+                                .foregroundColor(.white)
+                            if !pairingService.connectedDevices.isEmpty {
+                                Text("\(pairingService.connectedDevices.count)")
+                                    .font(.caption)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+                                    .frame(width: 22, height: 22)
+                                    .background(Color.green)
+                                    .clipShape(Circle())
+                            }
+                        }
+                        .padding(20)
+                        .background(Color.blue)
+                        .clipShape(Circle())
+                        .shadow(radius: 10)
                     }
                     .padding(.top, 60)
                     .padding(.trailing, 60)
@@ -80,6 +96,21 @@ struct ContentView: View {
                 PairingView()
             }
         }
+        .onChange(of: queueService.currentlyPlaying) { _, newValue in
+            // Auto-open player when queue starts playing
+            if newValue != nil && !showQueuePlayer {
+                showQueuePlayer = true
+            }
+        }
+        .fullScreenCover(isPresented: $showQueuePlayer) {
+            if let entry = queueService.currentlyPlaying {
+                QueuePlayerView(initialEntry: entry)
+            }
+        }
+        .onAppear {
+            // Wire queue service to socket service
+            queueService.attach(to: pairingService.socketService)
+        }
     }
 }
 
@@ -89,4 +120,5 @@ struct ContentView: View {
     ContentView()
         .environmentObject(AppSupabaseClient.shared)
         .environmentObject(DevicePairingService())
+        .environmentObject(QueueService())
 }
