@@ -10,6 +10,9 @@ packages:
   Supabase:
     url: https://github.com/supabase/supabase-swift.git
     from: "2.0.0"
+  SocketIO:
+    url: https://github.com/socketio/socket.io-client-swift.git
+    from: "16.1.1"
 
 targets:
   KTVSinger:
@@ -23,6 +26,8 @@ targets:
       - path: Features
     dependencies:
       - package: Supabase
+      - package: SocketIO
+        product: SocketIO
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ktvsinger.tvos

@@ -5,6 +5,11 @@ dist
 build
 .claude/
 mobile/.expo/
+mobile/ios/
+mobile/android/
+
+# Temp build artifacts
+*.player-script.js
 
 # tvOS
 tvos/.build/

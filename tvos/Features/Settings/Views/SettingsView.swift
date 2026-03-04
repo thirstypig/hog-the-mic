@@ -85,7 +85,7 @@ struct SettingsView: View {
                         } else {
                             ForEach(pairingService.connectedDevices) { device in
                                 HStack {
-                                    Image(systemName: deviceIcon(for: device.type))
+                                    Image(systemName: "iphone")
                                         .font(.title3)
                                     Text(device.name)
                                         .font(.title3)
@@ -139,14 +139,6 @@ struct SettingsView: View {
         }
     }
     
-    private func deviceIcon(for type: ConnectedDevice.DeviceType) -> String {
-        switch type {
-        case .iPhone: return "iphone"
-        case .iPad: return "ipad"
-        case .android: return "smartphone"
-        case .unknown: return "device"
-        }
-    }
 }
 
 struct SettingsSection<Content: View>: View {

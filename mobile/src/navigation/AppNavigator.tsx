@@ -8,6 +8,7 @@ import LandingScreen from "@screens/LandingScreen";
 import HomeScreen from "@screens/HomeScreen";
 import PlayerScreen from "@screens/PlayerScreen";
 import SearchScreen from "@screens/SearchScreen";
+import PairScreen from "@screens/PairScreen";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -44,6 +45,7 @@ export default function AppNavigator() {
         <Stack.Screen name="Home" component={HomeScreen} />
         <Stack.Screen name="Player" component={PlayerScreen} />
         <Stack.Screen name="Search" component={SearchScreen} />
+        <Stack.Screen name="Pair" component={PairScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

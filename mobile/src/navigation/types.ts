@@ -6,6 +6,7 @@ export type RootStackParamList = {
   Home: undefined;
   Player: { song: Song };
   Search: { query?: string } | undefined;
+  Pair: undefined;
 };
 
 /** Tab navigator nested inside Home */

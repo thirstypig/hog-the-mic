@@ -14,11 +14,13 @@
 		5944ACD1EFE6A32BA16450FF /* DeviceConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D77D8E97008672FB7B0FFCB /* DeviceConnection.swift */; };
 		5F7F517B9BB5D9BED1321225 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 242697E18AEAB60CBAFEFDD9 /* SettingsView.swift */; };
 		6AF083A00151BDEC30C16B07 /* PairingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C079225F143228A7055E1632 /* PairingView.swift */; };
+		6DCC7E9405E9B5A6D12BA565 /* SocketPairingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC88BBE882CD4149BAF5CA9E /* SocketPairingService.swift */; };
 		6F95E889AB7BEA35A714BAF4 /* SupabaseClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DB3E9FFFBE22CBBA15135DC /* SupabaseClient.swift */; };
 		736A530EE928DFDDF639D8EF /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91E57604D0623F07EF4CA692 /* APIClient.swift */; };
 		753B4F4E904112473E91503F /* APIError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14DDB28444B3EA41642CCE05 /* APIError.swift */; };
 		7AB83E55365371E8429C7636 /* LyricsSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CCD25ACB63D04CCC24D2982 /* LyricsSyncService.swift */; };
 		7BACFB9AF8197EE0F82B70B6 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = A5F64993CEC01C3B19A26EC4 /* Supabase */; };
+		92981B7EFA3D0BDCD120A69C /* SocketIO in Frameworks */ = {isa = PBXBuildFile; productRef = B4F6B415090C4942A2796B12 /* SocketIO */; };
 		9A2D002B5E3DA17322C65B4A /* AuthenticationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9799C4F61443A751B5FAE4A /* AuthenticationView.swift */; };
 		D03946AD48BAB3AADFC0C211 /* KTVSingerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0BF10A32072B201D874BFF2 /* KTVSingerApp.swift */; };
 		D049FBB55116A037A13868A2 /* DevicePairingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35DD97D5B365D828A64CE641 /* DevicePairingService.swift */; };
@@ -45,6 +47,7 @@
 		C079225F143228A7055E1632 /* PairingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingView.swift; sourceTree = "<group>"; };
 		C9799C4F61443A751B5FAE4A /* AuthenticationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticationView.swift; sourceTree = "<group>"; };
 		D0BF10A32072B201D874BFF2 /* KTVSingerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KTVSingerApp.swift; sourceTree = "<group>"; };
+		EC88BBE882CD4149BAF5CA9E /* SocketPairingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SocketPairingService.swift; sourceTree = "<group>"; };
 		FC836AEDD01F0D4DBEA8E058 /* SongBrowserViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SongBrowserViewModel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -54,6 +57,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				7BACFB9AF8197EE0F82B70B6 /* Supabase in Frameworks */,
+				92981B7EFA3D0BDCD120A69C /* SocketIO in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -132,9 +136,19 @@
 		5C472FB32EB078F41EDD06A2 /* Pairing */ = {
 			isa = PBXGroup;
 			children = (
+				6FB1AF7AA8E91CA1F39A945F /* Services */,
+				9E6CFF915089BAB22582B061 /* ViewModels */,
 				745F27E84E5DE29FAA2BF872 /* Views */,
 			);
 			path = Pairing;
+			sourceTree = "<group>";
+		};
+		6FB1AF7AA8E91CA1F39A945F /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				EC88BBE882CD4149BAF5CA9E /* SocketPairingService.swift */,
+			);
+			path = Services;
 			sourceTree = "<group>";
 		};
 		745F27E84E5DE29FAA2BF872 /* Views */ = {
@@ -181,6 +195,13 @@
 				14DDB28444B3EA41642CCE05 /* APIError.swift */,
 			);
 			path = Networking;
+			sourceTree = "<group>";
+		};
+		9E6CFF915089BAB22582B061 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = ViewModels;
 			sourceTree = "<group>";
 		};
 		A4818B37C0E4277608F8CA51 /* Authentication */ = {
@@ -277,6 +298,7 @@
 			name = KTVSinger;
 			packageProductDependencies = (
 				A5F64993CEC01C3B19A26EC4 /* Supabase */,
+				B4F6B415090C4942A2796B12 /* SocketIO */,
 			);
 			productName = KTVSinger;
 			productReference = 46AA6DA6F2002F6EFB8C592C /* KTVSinger.app */;
@@ -307,6 +329,7 @@
 			mainGroup = 7D9F7938E5967CD478ECDE0E;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				1414D4F1A0FC5253038DFD2D /* XCRemoteSwiftPackageReference "socket.io-client-swift" */,
 				93AF43B9C3C84018B60CCFB0 /* XCRemoteSwiftPackageReference "supabase-swift" */,
 			);
 			projectDirPath = "";
@@ -334,6 +357,7 @@
 				0CDE1BCA967CEA363D1C6A8B /* PlayerView.swift in Sources */,
 				EDC8E5F59BED9476BA2E9F42 /* PlayerViewModel.swift in Sources */,
 				5F7F517B9BB5D9BED1321225 /* SettingsView.swift in Sources */,
+				6DCC7E9405E9B5A6D12BA565 /* SocketPairingService.swift in Sources */,
 				032B9FF656A39CA54FFD6696 /* Song.swift in Sources */,
 				D845F39E7032720DE2992DE4 /* SongBrowserView.swift in Sources */,
 				512E138CC8FAAAE99710B2CA /* SongBrowserViewModel.swift in Sources */,
@@ -530,6 +554,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		1414D4F1A0FC5253038DFD2D /* XCRemoteSwiftPackageReference "socket.io-client-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/socketio/socket.io-client-swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 16.1.1;
+			};
+		};
 		93AF43B9C3C84018B60CCFB0 /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/supabase/supabase-swift.git";
@@ -545,6 +577,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 93AF43B9C3C84018B60CCFB0 /* XCRemoteSwiftPackageReference "supabase-swift" */;
 			productName = Supabase;
+		};
+		B4F6B415090C4942A2796B12 /* SocketIO */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1414D4F1A0FC5253038DFD2D /* XCRemoteSwiftPackageReference "socket.io-client-swift" */;
+			productName = SocketIO;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

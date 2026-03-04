@@ -5,8 +5,8 @@
   "scripts": {
     "start": "expo start",
     "web": "expo start --web",
-    "ios": "expo start --ios",
-    "android": "expo start --android",
+    "ios": "expo run:ios",
+    "android": "expo run:android",
     "check": "tsc --noEmit"
   },
   "dependencies": {
@@ -18,7 +18,7 @@
     "babel-plugin-module-resolver": "^5.0.2",
     "clsx": "^2.1.1",
     "expo": "~55.0.4",
-    "expo-av": "~16.0.0",
+    "expo-camera": "~55.0.9",
     "expo-linking": "~55.0.0",
     "expo-status-bar": "~55.0.4",
     "lucide-react-native": "^0.575.0",
@@ -33,6 +33,7 @@
     "react-native-screens": "~4.23.0",
     "react-native-svg": "^15.15.3",
     "react-native-web": "^0.21.2",
+    "socket.io-client": "^4.8.3",
     "tailwind-merge": "^3.5.0",
     "zod": "^3.24.0"
   },

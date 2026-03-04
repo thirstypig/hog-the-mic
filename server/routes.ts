@@ -8,6 +8,7 @@ import { registerScoringRoutes, registerPlaysRoutes } from "./features/scoring";
 import { registerPlaylistRoutes } from "./features/playlist";
 import { registerVocalSeparationRoutes } from "./features/vocal-separation";
 import { registerStreamingRoutes } from "./features/streaming";
+import { registerPairingRoutes, setupPairingSocket } from "./features/pairing";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication (must come first — installs session + passport middleware)
@@ -22,8 +23,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerPlaylistRoutes(app);
   registerVocalSeparationRoutes(app);
   registerStreamingRoutes(app);
+  registerPairingRoutes(app);
 
   const httpServer = createServer(app);
+
+  // Attach socket.io for real-time pairing
+  setupPairingSocket(httpServer);
 
   return httpServer;
 }

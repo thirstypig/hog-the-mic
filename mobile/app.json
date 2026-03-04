@@ -14,8 +14,20 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.ktvsinger.app"
+      "bundleIdentifier": "com.ktvsinger.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Allow KTV Singer to scan QR codes for TV pairing",
+        "NSMicrophoneUsageDescription": "KTV Singer needs microphone access for karaoke singing"
+      }
     },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow KTV Singer to scan QR codes for TV pairing"
+        }
+      ]
+    ],
     "web": {
       "bundler": "metro",
       "favicon": "./assets/favicon.png"

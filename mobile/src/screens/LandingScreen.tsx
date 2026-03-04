@@ -55,6 +55,16 @@ export default function LandingScreen() {
       {/* Header bar */}
       <View className="flex-row items-center justify-end px-tv-4 py-tv-2">
         <Pressable
+          className="mr-tv-2 px-tv-2 py-tv-1 rounded-tv-md bg-primary"
+          onPress={() => navigation.navigate("Pair")}
+          {...(Platform.isTV && { isTVSelectable: true })}
+        >
+          <Text className="text-tv-sm text-primary-foreground font-bold">
+            Connect to TV
+          </Text>
+        </Pressable>
+
+        <Pressable
           className="mr-tv-2 px-tv-2 py-tv-1 rounded-tv-md bg-muted"
           onPress={() => navigation.navigate("Home")}
           {...(Platform.isTV && { isTVSelectable: true })}

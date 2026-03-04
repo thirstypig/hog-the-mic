@@ -37,24 +37,44 @@ export async function getStreamInfo(videoId: string): Promise<StreamInfo> {
 
   // Prefer combined formats (video+audio in one stream) for AVPlayer
   // AVPlayer handles mp4 best; fall back to highest quality available
+  // Filter strictly: must have audio codec (not just hasAudio flag)
+  const hasRealAudio = (f: (typeof info.formats)[0]) =>
+    f.hasAudio && f.audioBitrate && f.audioBitrate > 0;
+
   const combinedFormats = info.formats.filter(
-    (f) => f.hasVideo && f.hasAudio && f.container === "mp4"
+    (f) => f.hasVideo && hasRealAudio(f) && f.container === "mp4"
   );
 
   let chosen = combinedFormats.sort(
     (a, b) => (b.height ?? 0) - (a.height ?? 0)
   )[0];
 
-  // Fall back to any combined format if no mp4
+  // Last resort: any format with real audio
   if (!chosen) {
-    chosen = info.formats.filter((f) => f.hasVideo && f.hasAudio).sort(
-      (a, b) => (b.height ?? 0) - (a.height ?? 0)
-    )[0];
+    chosen = info.formats
+      .filter((f) => f.hasVideo && hasRealAudio(f))
+      .sort((a, b) => (b.height ?? 0) - (a.height ?? 0))[0];
   }
 
   if (!chosen || !chosen.url) {
+    console.error(
+      `[streaming] No playable format for ${videoId}. Available formats:`,
+      info.formats.map((f) => ({
+        itag: f.itag,
+        container: f.container,
+        hasVideo: f.hasVideo,
+        hasAudio: f.hasAudio,
+        audioBitrate: f.audioBitrate,
+        mimeType: f.mimeType,
+        quality: f.qualityLabel,
+      }))
+    );
     throw new Error("No playable stream found for this video");
   }
+
+  console.log(
+    `[streaming] ${videoId}: selected itag=${chosen.itag} ${chosen.container} ${chosen.qualityLabel ?? chosen.height + "p"} audio=${chosen.audioBitrate}kbps`
+  );
 
   const expiresAt = Date.now() + CACHE_TTL_MS;
   const streamInfo: StreamInfo = {

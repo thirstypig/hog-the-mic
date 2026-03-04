@@ -6,22 +6,28 @@
 //
 
 import SwiftUI
+import AVFoundation
 
 @main
 struct KTVSingerApp: App {
     @StateObject private var supabase = AppSupabaseClient.shared
     @StateObject private var pairingService = DevicePairingService()
 
+    init() {
+        do {
+            let audioSession = AVAudioSession.sharedInstance()
+            try audioSession.setCategory(.playback, mode: .default)
+            try audioSession.setActive(true)
+        } catch {
+            print("AVAudioSession setup failed: \(error)")
+        }
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(supabase)
                 .environmentObject(pairingService)
-                .onAppear {
-                    Task {
-                        try? await pairingService.startListening()
-                    }
-                }
         }
     }
 }
