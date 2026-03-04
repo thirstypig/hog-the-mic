@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { getStreamInfo } from "./streaming.service";
+import { getStreamInfo, StreamError } from "./streaming.service";
 
 export function registerStreamingRoutes(app: Express) {
   // GET /api/youtube/stream/:videoId
@@ -15,10 +15,19 @@ export function registerStreamingRoutes(app: Express) {
       const streamInfo = await getStreamInfo(videoId);
       res.json(streamInfo);
     } catch (error) {
-      console.error("Stream extraction error:", error);
-      const message =
-        error instanceof Error ? error.message : "Failed to extract stream";
-      res.status(500).json({ error: message });
+      if (error instanceof StreamError) {
+        console.error(
+          `[streaming] ${req.params.videoId}: ${error.code} — ${error.message}`,
+        );
+        res
+          .status(error.statusCode)
+          .json({ error: error.message, code: error.code });
+      } else {
+        console.error("Stream extraction error:", error);
+        const message =
+          error instanceof Error ? error.message : "Failed to extract stream";
+        res.status(500).json({ error: message, code: "UNKNOWN" });
+      }
     }
   });
 }

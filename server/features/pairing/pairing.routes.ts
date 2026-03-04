@@ -1,25 +1,9 @@
 import type { Express } from "express";
 import { randomUUID, randomBytes } from "crypto";
 import type { PairingSession } from "./pairing.types";
+import type { SessionStore } from "./session-store";
 
-/** In-memory session store — shared with pairing.socket.ts */
-export const sessions = new Map<string, PairingSession>();
-
-/** Clean up sessions older than 4 hours */
-const SESSION_TTL = 4 * 60 * 60 * 1000;
-
-function pruneExpired() {
-  const now = Date.now();
-  const expired: string[] = [];
-  sessions.forEach((session, id) => {
-    if (now - session.createdAt > SESSION_TTL) {
-      expired.push(id);
-    }
-  });
-  expired.forEach((id) => sessions.delete(id));
-}
-
-// ── Rate limiting ─────────────────────────────────────────────
+// ── Rate limiting (per-process, in-memory) ───────────────────────
 const RATE_LIMIT_WINDOW = 60_000; // 1 minute
 const RATE_LIMIT_MAX = 10; // max sessions per IP per window
 const MAX_TOTAL_SESSIONS = 100;
@@ -39,11 +23,9 @@ function recordRequest(ip: string) {
   ipRequestLog.set(ip, timestamps);
 }
 
-export function registerPairingRoutes(app: Express) {
+export function registerPairingRoutes(app: Express, sessionStore: SessionStore) {
   /** POST /api/pairing/sessions — create a new ephemeral session */
-  app.post("/api/pairing/sessions", (req, res) => {
-    pruneExpired();
-
+  app.post("/api/pairing/sessions", async (req, res) => {
     const ip = req.ip || req.socket.remoteAddress || "unknown";
 
     // Rate limit per IP
@@ -53,7 +35,8 @@ export function registerPairingRoutes(app: Express) {
     }
 
     // Global session cap
-    if (sessions.size >= MAX_TOTAL_SESSIONS) {
+    const count = await sessionStore.count();
+    if (count >= MAX_TOTAL_SESSIONS) {
       res.status(503).json({ message: "Server at capacity. Try again later." });
       return;
     }
@@ -66,18 +49,18 @@ export function registerPairingRoutes(app: Express) {
       id,
       tvSecret,
       createdAt: Date.now(),
-      members: new Map(),
+      members: {},
       queue: [],
       currentlyPlaying: null,
     };
-    sessions.set(id, session);
+    await sessionStore.create(session);
 
     res.json({ sessionId: id, tvSecret });
   });
 
   /** GET /api/pairing/sessions/:id — check if a session exists */
-  app.get("/api/pairing/sessions/:id", (req, res) => {
-    const session = sessions.get(req.params.id);
+  app.get("/api/pairing/sessions/:id", async (req, res) => {
+    const session = await sessionStore.get(req.params.id);
     if (!session) {
       res.status(404).json({ message: "Session not found" });
       return;
@@ -85,14 +68,14 @@ export function registerPairingRoutes(app: Express) {
 
     const singers: Array<{ socketId: string; deviceName: string }> = [];
     let tvConnected = false;
-    session.members.forEach((m) => {
+    for (const m of Object.values(session.members)) {
       if (m.role === "singer") {
         singers.push({ socketId: m.socketId, deviceName: m.deviceName });
       }
       if (m.role === "tv") {
         tvConnected = true;
       }
-    });
+    }
 
     res.json({ sessionId: session.id, singers, tvConnected });
   });

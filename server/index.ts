@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { execFile } from "child_process";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { initRedis, closeRedis } from "./redis";
 
 const app = express();
 
@@ -55,7 +56,10 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  const server = await registerRoutes(app);
+  // Initialize Redis (optional — falls back to in-memory if REDIS_URL not set)
+  initRedis();
+
+  const { httpServer: server, io } = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
@@ -94,4 +98,33 @@ app.use((req, res, next) => {
   }, () => {
     log(`serving on port ${port}`);
   });
+
+  // ── Graceful shutdown ───────────────────────────────────────
+  let shuttingDown = false;
+
+  function gracefulShutdown(signal: string) {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    log(`${signal} received — shutting down gracefully…`);
+
+    // Close all socket.io connections, then stop HTTP server
+    io.close(() => {
+      log("Socket.IO connections closed");
+      closeRedis().then(() => {
+        server.close(() => {
+          log("HTTP server closed");
+          process.exit(0);
+        });
+      });
+    });
+
+    // Force exit after 10s if connections don't drain
+    setTimeout(() => {
+      log("Forcing shutdown after timeout");
+      process.exit(1);
+    }, 10_000).unref();
+  }
+
+  process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+  process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 })();

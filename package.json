@@ -19,6 +19,7 @@
     "express-session": "^1.18.1",
     "form-data": "^4.0.4",
     "googleapis": "^164.0.0",
+    "ioredis": "^5.10.0",
     "memoizee": "^0.4.17",
     "memorystore": "^1.6.7",
     "openid-client": "^6.8.1",

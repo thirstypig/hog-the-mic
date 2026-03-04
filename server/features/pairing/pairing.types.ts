@@ -3,7 +3,7 @@ export interface PairingSession {
   id: string;
   tvSecret: string;
   createdAt: number;
-  members: Map<string, SessionMember>;
+  members: Record<string, SessionMember>;
   queue: QueueEntry[];
   currentlyPlaying: QueueEntry | null;
 }
