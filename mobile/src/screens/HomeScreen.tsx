@@ -1,9 +1,9 @@
-import { View, Text, FlatList, Image, Pressable, Platform } from "react-native";
+import { View, Text, FlatList, Image, Pressable } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useQuery } from "@tanstack/react-query";
-import { Music } from "lucide-react-native";
-import FocusableCard from "@common/components/FocusableCard";
+import { Music, ArrowLeft } from "lucide-react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useToast } from "@common/hooks/use-toast";
 import { colors } from "@theme/colors";
 import { useQueue } from "@features/pairing";
@@ -14,6 +14,7 @@ type Nav = NativeStackNavigationProp<RootStackParamList, "Home">;
 
 export default function HomeScreen() {
   const navigation = useNavigation<Nav>();
+  const insets = useSafeAreaInsets();
   const { toast } = useToast();
   const { addToQueue, currentlyPlaying, isPaired } = useQueue();
 
@@ -22,109 +23,93 @@ export default function HomeScreen() {
   });
 
   const handleSongPress = (song: Song) => {
-    if (isPaired) {
-      addToQueue({
-        songId: song.id,
-        videoId: song.videoId,
-        title: song.title,
-        artist: song.artist,
-        thumbnailUrl: song.thumbnailUrl,
-      });
+    if (!isPaired) {
       toast({
-        title: "Added to Queue",
-        description: `${song.title} by ${song.artist}`,
+        title: "No Active Session",
+        description: "Start a karaoke session first to add songs to the queue.",
+        variant: "destructive",
       });
-    } else {
-      navigation.navigate("Player", { song });
+      return;
     }
+    addToQueue({
+      songId: song.id,
+      videoId: song.videoId,
+      title: song.title,
+      artist: song.artist,
+      thumbnailUrl: song.thumbnailUrl,
+    });
+    toast({
+      title: "Added to Queue",
+      description: `${song.title} by ${song.artist}`,
+    });
   };
 
   const renderSongCard = ({ item }: { item: Song }) => (
-    <FocusableCard
-      className="m-tv-1 p-0 overflow-hidden"
-      style={{ width: 280 }}
+    <Pressable
+      className="flex-1 m-1.5 bg-card rounded-xl overflow-hidden border border-border"
       onPress={() => handleSongPress(item)}
     >
       {item.thumbnailUrl ? (
         <Image
           source={{ uri: item.thumbnailUrl }}
           className="w-full"
-          style={{ height: 160 }}
+          style={{ height: 120 }}
           resizeMode="cover"
         />
       ) : (
         <View
           className="w-full items-center justify-center bg-muted"
-          style={{ height: 160 }}
+          style={{ height: 120 }}
         >
-          <Music size={48} color={colors.mutedForeground} />
+          <Music size={32} color={colors.mutedForeground} />
         </View>
       )}
-      <View className="p-tv-2">
-        <Text
-          className="text-tv-sm font-bold text-foreground"
-          numberOfLines={1}
-        >
+      <View className="p-2.5">
+        <Text className="text-sm font-bold text-foreground" numberOfLines={1}>
           {item.title}
         </Text>
-        <Text
-          className="text-tv-xs text-muted-foreground mt-1"
-          numberOfLines={1}
-        >
+        <Text className="text-xs text-muted-foreground mt-0.5" numberOfLines={1}>
           {item.artist}
         </Text>
       </View>
-    </FocusableCard>
+    </Pressable>
   );
 
   return (
-    <View className="flex-1 bg-background px-tv-4 pt-tv-4">
+    <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       {/* Header */}
-      <View className="flex-row items-center mb-tv-4">
-        <View className="w-12 h-12 rounded-tv-md bg-primary/20 items-center justify-center mr-tv-2">
-          <Music size={28} color={colors.primary} />
-        </View>
-        <Text className="text-tv-xl font-bold text-foreground">
+      <View className="flex-row items-center px-4 pt-4 pb-3">
+        <Pressable className="mr-3 p-1" onPress={() => navigation.goBack()}>
+          <ArrowLeft size={24} color={colors.foreground} />
+        </Pressable>
+        <Music size={24} color={colors.primary} />
+        <Text className="text-xl font-bold text-foreground ml-2 flex-1">
           Song Library
         </Text>
-
-        <View className="flex-1" />
-
-        <Pressable
-          className="px-tv-3 py-tv-1 rounded-tv-md bg-primary"
-          onPress={() => navigation.navigate("Search")}
-          {...(Platform.isTV && { isTVSelectable: true })}
-        >
-          <Text className="text-tv-sm text-primary-foreground font-bold">
-            Search
-          </Text>
-        </Pressable>
       </View>
 
       {/* Now Playing bar (when paired) */}
       {isPaired && currentlyPlaying && (
         <Pressable
-          className="flex-row items-center p-3 bg-primary/10 rounded-lg mb-3 border border-primary/20"
+          className="flex-row items-center mx-4 p-3 bg-primary/10 rounded-lg mb-3 border border-primary/20"
           onPress={() => navigation.navigate("Pair")}
         >
           <View className="w-2 h-2 rounded-full bg-green-500 mr-2" />
           <Text className="text-foreground text-sm font-semibold flex-1" numberOfLines={1}>
-            Now Playing: {currentlyPlaying.title} - {currentlyPlaying.artist}
+            {currentlyPlaying.title} - {currentlyPlaying.artist}
           </Text>
-          <Text className="text-primary text-xs">View Queue</Text>
+          <Text className="text-primary text-xs">Queue</Text>
         </Pressable>
       )}
 
       {/* Song grid */}
       {isLoading ? (
         <View className="flex-1 items-center justify-center">
-          <Text className="text-tv-base text-muted-foreground">
-            Loading songs...
-          </Text>
+          <Text className="text-base text-muted-foreground">Loading songs...</Text>
         </View>
       ) : songs.length === 0 ? (
-        <View className="flex-1 items-center justify-center">
-          <Text className="text-tv-base text-muted-foreground">
+        <View className="flex-1 items-center justify-center px-6">
+          <Text className="text-base text-muted-foreground text-center">
             No songs yet. Search to add your first song!
           </Text>
         </View>
@@ -133,9 +118,8 @@ export default function HomeScreen() {
           data={songs}
           renderItem={renderSongCard}
           keyExtractor={(item) => item.id}
-          numColumns={Platform.isTV ? 5 : 2}
-          key={Platform.isTV ? "tv" : "mobile"}
-          contentContainerStyle={{ paddingBottom: 48 }}
+          numColumns={2}
+          contentContainerStyle={{ paddingHorizontal: 8, paddingBottom: 48 }}
         />
       )}
     </View>

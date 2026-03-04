@@ -51,6 +51,11 @@ export interface RemoveFromQueuePayload {
   queueId: string;
 }
 
+export interface ReorderQueuePayload {
+  queueId: string;
+  newIndex: number;
+}
+
 // ── Socket.io event payloads ────────────────────────────────────
 
 /** Client → Server */
@@ -96,6 +101,7 @@ export interface ClientToServerEvents {
   join_session: (payload: JoinSessionPayload) => void;
   add_to_queue: (payload: AddToQueuePayload) => void;
   remove_from_queue: (payload: RemoveFromQueuePayload) => void;
+  reorder_queue: (payload: ReorderQueuePayload) => void;
   skip_song: () => void;
   song_finished: () => void;
   audio_chunk: (data: Buffer) => void;

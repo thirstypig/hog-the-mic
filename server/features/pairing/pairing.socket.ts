@@ -93,6 +93,14 @@ export function setupPairingSocket(httpServer: Server) {
       const session = sessions.get(info.sessionId);
       if (!session) return;
 
+      // 10-song limit (queue + currently playing)
+      const totalSongs =
+        session.queue.length + (session.currentlyPlaying ? 1 : 0);
+      if (totalSongs >= 10) {
+        socket.emit("error", { message: "Queue is full (max 10 songs)" });
+        return;
+      }
+
       const entry: QueueEntry = {
         queueId: randomUUID(),
         songId: payload.songId,
@@ -129,6 +137,27 @@ export function setupPairingSocket(httpServer: Server) {
       session.queue = session.queue.filter(
         (e) => e.queueId !== payload.queueId,
       );
+      emitQueueUpdated(info.sessionId);
+    });
+
+    socket.on("reorder_queue", (payload) => {
+      const info = socketSessionMap.get(socket.id);
+      if (!info) return;
+
+      const session = sessions.get(info.sessionId);
+      if (!session) return;
+
+      const idx = session.queue.findIndex(
+        (e) => e.queueId === payload.queueId,
+      );
+      if (idx === -1) return;
+
+      const [entry] = session.queue.splice(idx, 1);
+      const clampedIndex = Math.max(
+        0,
+        Math.min(payload.newIndex, session.queue.length),
+      );
+      session.queue.splice(clampedIndex, 0, entry);
       emitQueueUpdated(info.sessionId);
     });
 

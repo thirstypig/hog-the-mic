@@ -13,11 +13,12 @@ struct KTVSingerApp: App {
     @StateObject private var supabase = AppSupabaseClient.shared
     @StateObject private var pairingService = DevicePairingService()
     @StateObject private var queueService = QueueService()
+    @StateObject private var audioStreamService = AudioStreamService()
 
     init() {
         do {
             let audioSession = AVAudioSession.sharedInstance()
-            try audioSession.setCategory(.playback, mode: .default)
+            try audioSession.setCategory(.playback, mode: .default, options: [.mixWithOthers])
             try audioSession.setActive(true)
         } catch {
             print("AVAudioSession setup failed: \(error)")
@@ -30,6 +31,7 @@ struct KTVSingerApp: App {
                 .environmentObject(supabase)
                 .environmentObject(pairingService)
                 .environmentObject(queueService)
+                .environmentObject(audioStreamService)
         }
     }
 }
@@ -38,6 +40,7 @@ struct ContentView: View {
     @EnvironmentObject var supabase: AppSupabaseClient
     @EnvironmentObject var pairingService: DevicePairingService
     @EnvironmentObject var queueService: QueueService
+    @EnvironmentObject var audioStreamService: AudioStreamService
     @State private var showPairingSheet = false
     @State private var showQueuePlayer = false
 
@@ -108,8 +111,9 @@ struct ContentView: View {
             }
         }
         .onAppear {
-            // Wire queue service to socket service
+            // Wire queue service and audio stream to socket service
             queueService.attach(to: pairingService.socketService)
+            audioStreamService.attach(to: pairingService.socketService)
         }
     }
 }
@@ -121,4 +125,5 @@ struct ContentView: View {
         .environmentObject(AppSupabaseClient.shared)
         .environmentObject(DevicePairingService())
         .environmentObject(QueueService())
+        .environmentObject(AudioStreamService())
 }

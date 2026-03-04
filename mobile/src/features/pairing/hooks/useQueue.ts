@@ -81,17 +81,31 @@ export function useQueue() {
     socket.emit("skip_song");
   }, []);
 
+  const reorderQueue = useCallback((queueId: string, newIndex: number) => {
+    const socket = getSocket();
+    if (!socket) return;
+    socket.emit("reorder_queue", { queueId, newIndex });
+  }, []);
+
   const isPaired = useMemo(() => {
     const socket = getSocket();
     return socket?.connected ?? false;
   }, [queueState]); // re-evaluate when queue state changes (proxy for connection)
 
+  const isQueueFull = useMemo(() => {
+    const total =
+      queueState.upcoming.length + (queueState.currentlyPlaying ? 1 : 0);
+    return total >= 10;
+  }, [queueState]);
+
   return {
     currentlyPlaying: queueState.currentlyPlaying,
     upcoming: queueState.upcoming,
     isPaired,
+    isQueueFull,
     addToQueue,
     removeFromQueue,
+    reorderQueue,
     skipSong,
   };
 }

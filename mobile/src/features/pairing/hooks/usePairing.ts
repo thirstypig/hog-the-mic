@@ -89,6 +89,67 @@ export function usePairing() {
     }
   }, []);
 
+  /** Create a new session (host mode) and connect as singer */
+  const createSession = useCallback(async (serverBaseUrl: string) => {
+    try {
+      setStatus("connecting");
+      setServerURL(serverBaseUrl);
+
+      const res = await fetch(`${serverBaseUrl}/api/pairing/sessions`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error("Failed to create session");
+
+      const { sessionId: newSessionId } = await res.json();
+      setSessionId(newSessionId);
+
+      const socket = connectSocket(serverBaseUrl);
+
+      socket.on("connect", () => {
+        if (cleanupRef.current) return;
+        const deviceName =
+          Platform.OS === "ios" ? "iPhone" : Platform.OS === "android" ? "Android" : "Device";
+        socket.emit("join_session", {
+          sessionId: newSessionId,
+          role: "singer" as const,
+          deviceName,
+        });
+      });
+
+      socket.on("paired", (data: PairedPayload) => {
+        if (cleanupRef.current) return;
+        setStatus("paired");
+        setSessionId(data.sessionId);
+      });
+
+      socket.on("session_state", (state: SessionStatePayload) => {
+        if (cleanupRef.current) return;
+        setSessionState(state);
+      });
+
+      socket.on("error", (err: { message: string }) => {
+        if (cleanupRef.current) return;
+        setStatus("error");
+        setErrorMessage(err.message);
+      });
+
+      socket.on("connect_error", () => {
+        if (cleanupRef.current) return;
+        setStatus("error");
+        setErrorMessage("Could not connect to server");
+      });
+
+      socket.on("disconnect", () => {
+        if (cleanupRef.current) return;
+        setStatus("idle");
+        setSessionState(null);
+      });
+    } catch {
+      setStatus("error");
+      setErrorMessage("Failed to create session");
+    }
+  }, []);
+
   /** Disconnect from the current session */
   const disconnect = useCallback(() => {
     disconnectSocket();
@@ -106,6 +167,7 @@ export function usePairing() {
     sessionState,
     errorMessage,
     handleQRScanned,
+    createSession,
     disconnect,
     socket: getSocket(),
   };

@@ -5,7 +5,6 @@ import {
   TextInput,
   FlatList,
   Pressable,
-  Platform,
   ActivityIndicator,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
@@ -17,7 +16,6 @@ import { useQueue } from "@features/pairing";
 import { useToast } from "@common/hooks/use-toast";
 import { apiUrl } from "@common/lib/api";
 import { queryClient } from "@common/lib/queryClient";
-import FocusableCard from "@common/components/FocusableCard";
 import { colors } from "@theme/colors";
 import type { RootStackParamList } from "@navigation/types";
 import type { LRCLibSearchResult, SearchResult } from "@features/search";
@@ -42,25 +40,17 @@ export default function SearchScreen() {
     loadMore,
   } = useSearch(initialQuery);
 
-  // Auto-search if navigated with a query
   useEffect(() => {
     if (initialQuery) {
       handleSearch(initialQuery);
     }
   }, [initialQuery]);
 
-  /**
-   * Search YouTube for a video matching this song.
-   * Tries the server endpoint first (Google API or Invidious fallback).
-   * If that fails, falls back to YouTube's internal search via page scraping.
-   */
   async function findYouTubeVideo(
     trackName: string,
     artistName: string,
   ): Promise<{ videoId: string; thumbnail: string } | null> {
     const query = `${trackName} ${artistName}`;
-
-    // Attempt 1: Server-side YouTube search
     try {
       const ytRes = await fetch(
         apiUrl(`/api/youtube/search?q=${encodeURIComponent(query)}`),
@@ -75,35 +65,23 @@ export default function SearchScreen() {
         }
       }
     } catch {
-      // fall through to next method
+      // fall through
     }
-
-    // Attempt 2: YouTube page scrape (works from browser)
-    if (Platform.OS === "web") {
-      try {
-        const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query + " karaoke lyrics")}`;
-        const resp = await fetch(searchUrl);
-        if (resp.ok) {
-          const html = await resp.text();
-          // Extract first video ID from ytInitialData
-          const match = html.match(/"videoId":"([a-zA-Z0-9_-]{11})"/);
-          if (match) {
-            return {
-              videoId: match[1],
-              thumbnail: `https://i.ytimg.com/vi/${match[1]}/hqdefault.jpg`,
-            };
-          }
-        }
-      } catch {
-        // fall through
-      }
-    }
-
     return null;
   }
 
-  const handlePlayResult = async (result: LRCLibSearchResult) => {
-    if (loadingId) return; // prevent double-tap
+  const handleAddToQueue = async (result: LRCLibSearchResult) => {
+    if (loadingId) return;
+
+    if (!isPaired) {
+      toast({
+        title: "No Active Session",
+        description: "Start a karaoke session first to add songs to the queue.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoadingId(result.id);
 
     try {
@@ -112,14 +90,11 @@ export default function SearchScreen() {
         description: `${result.trackName} by ${result.artistName}`,
       });
 
-      // Step 1: Find a YouTube video
       const video = await findYouTubeVideo(result.trackName, result.artistName);
-
-      // If we can't find a video, use a search-based video ID
       const videoId = video?.videoId || `search:${result.trackName} ${result.artistName}`;
       const thumbnail = video?.thumbnail || "";
 
-      // Step 2: Check if song already exists by video ID (only if we have a real ID)
+      // Check if song already exists
       let existingSong: Song | null = null;
       if (video?.videoId) {
         const existingRes = await fetch(apiUrl(`/api/songs/video/${video.videoId}`));
@@ -131,26 +106,21 @@ export default function SearchScreen() {
       if (existingSong) {
         await fetch(apiUrl(`/api/songs/${existingSong.id}/play`), { method: "POST" });
         queryClient.invalidateQueries({ queryKey: ["/api/songs"] });
-
-        if (isPaired) {
-          addToQueue({
-            songId: existingSong.id,
-            videoId: existingSong.videoId,
-            title: existingSong.title,
-            artist: existingSong.artist,
-            thumbnailUrl: existingSong.thumbnailUrl,
-          });
-          toast({
-            title: "Added to Queue",
-            description: `${existingSong.title} by ${existingSong.artist}`,
-          });
-        } else {
-          navigation.navigate("Player", { song: existingSong });
-        }
+        addToQueue({
+          songId: existingSong.id,
+          videoId: existingSong.videoId,
+          title: existingSong.title,
+          artist: existingSong.artist,
+          thumbnailUrl: existingSong.thumbnailUrl,
+        });
+        toast({
+          title: "Added to Queue",
+          description: `${existingSong.title} by ${existingSong.artist}`,
+        });
         return;
       }
 
-      // Step 3: Fetch lyrics from LRCLIB
+      // Fetch lyrics & save new song
       const lyricsRes = await fetch(
         apiUrl(
           `/api/lyrics?track=${encodeURIComponent(result.trackName)}&artist=${encodeURIComponent(result.artistName)}&duration=${result.duration}`,
@@ -166,7 +136,6 @@ export default function SearchScreen() {
       }
       const lyrics = await lyricsRes.json();
 
-      // Step 4: Save new song to database
       const saveRes = await fetch(apiUrl("/api/songs"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -189,23 +158,19 @@ export default function SearchScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/songs"] });
       await fetch(apiUrl(`/api/songs/${savedSong.id}/play`), { method: "POST" });
 
-      if (isPaired) {
-        addToQueue({
-          songId: savedSong.id,
-          videoId: savedSong.videoId,
-          title: savedSong.title,
-          artist: savedSong.artist,
-          thumbnailUrl: savedSong.thumbnailUrl,
-        });
-        toast({
-          title: "Added to Queue",
-          description: `${savedSong.title} by ${savedSong.artist}`,
-        });
-      } else {
-        navigation.navigate("Player", { song: savedSong });
-      }
+      addToQueue({
+        songId: savedSong.id,
+        videoId: savedSong.videoId,
+        title: savedSong.title,
+        artist: savedSong.artist,
+        thumbnailUrl: savedSong.thumbnailUrl,
+      });
+      toast({
+        title: "Added to Queue",
+        description: `${savedSong.title} by ${savedSong.artist}`,
+      });
     } catch (err) {
-      console.error("handlePlayResult error:", err);
+      console.error("handleAddToQueue error:", err);
       toast({
         title: "Error",
         description: "Failed to load this song. Please try another.",
@@ -217,15 +182,15 @@ export default function SearchScreen() {
   };
 
   const renderResult = ({ item }: { item: LRCLibSearchResult }) => (
-    <FocusableCard
-      className="mx-tv-2 mb-tv-2 p-tv-3 flex-row items-center"
-      onPress={() => handlePlayResult(item)}
+    <Pressable
+      className="mx-4 mb-2 p-3 bg-card rounded-lg border border-border flex-row items-center"
+      onPress={() => handleAddToQueue(item)}
     >
       <View className="flex-1">
-        <Text className="text-tv-sm font-bold text-foreground" numberOfLines={1}>
+        <Text className="text-sm font-bold text-foreground" numberOfLines={1}>
           {item.trackName}
         </Text>
-        <Text className="text-tv-xs text-muted-foreground" numberOfLines={1}>
+        <Text className="text-xs text-muted-foreground" numberOfLines={1}>
           {item.artistName}
           {item.albumName ? ` — ${item.albumName}` : ""}
         </Text>
@@ -233,39 +198,40 @@ export default function SearchScreen() {
       {loadingId === item.id ? (
         <ActivityIndicator size="small" color={colors.primary} />
       ) : (
-        <Text className="text-tv-xs text-muted-foreground ml-tv-2">
-          {Math.floor(item.duration / 60)}:{String(item.duration % 60).padStart(2, "0")}
-        </Text>
+        <View className="flex-row items-center">
+          <Text className="text-xs text-muted-foreground mr-2">
+            {Math.floor(item.duration / 60)}:{String(item.duration % 60).padStart(2, "0")}
+          </Text>
+          <View className="px-3 py-1.5 rounded-lg bg-primary/20">
+            <Text className="text-xs font-semibold text-primary">+ Queue</Text>
+          </View>
+        </View>
       )}
-    </FocusableCard>
+    </Pressable>
   );
 
   const visibleData = lrclibResults.slice(0, visibleResults);
 
   return (
-    <View className="flex-1 bg-background px-tv-4 pt-tv-4">
+    <View className="flex-1 bg-background">
       {/* Header */}
-      <View className="flex-row items-center mb-tv-4">
-        <Pressable
-          className="mr-tv-2 p-tv-1"
-          onPress={() => navigation.goBack()}
-          {...(Platform.isTV && { isTVSelectable: true })}
-        >
-          <ArrowLeft size={28} color={colors.foreground} />
+      <View className="flex-row items-center px-4 pt-4 pb-3">
+        <Pressable className="mr-3 p-1" onPress={() => navigation.goBack()}>
+          <ArrowLeft size={24} color={colors.foreground} />
         </Pressable>
-        <Text className="text-tv-xl font-bold text-foreground">Search</Text>
+        <Text className="text-xl font-bold text-foreground flex-1">Search</Text>
         {isPaired && (
-          <View className="ml-2 px-2 py-0.5 rounded bg-green-500/20">
+          <View className="px-2 py-0.5 rounded bg-green-500/20">
             <Text className="text-green-500 text-xs font-semibold">Paired</Text>
           </View>
         )}
       </View>
 
       {/* Search input */}
-      <View className="flex-row items-center bg-card border border-border rounded-tv-md px-tv-3 py-tv-2 mb-tv-4">
-        <Search size={22} color={colors.mutedForeground} />
+      <View className="flex-row items-center bg-card border border-border rounded-xl mx-4 px-4 py-3 mb-4">
+        <Search size={20} color={colors.mutedForeground} />
         <TextInput
-          className="flex-1 ml-tv-2 text-tv-base text-foreground"
+          className="flex-1 ml-3 text-base text-foreground"
           placeholder="Search for a song..."
           placeholderTextColor={colors.mutedForeground}
           defaultValue={initialQuery}
@@ -277,7 +243,8 @@ export default function SearchScreen() {
       {/* Results */}
       {searchMutation.isPending ? (
         <View className="flex-1 items-center justify-center">
-          <Text className="text-tv-base text-muted-foreground">Searching...</Text>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text className="text-base text-muted-foreground mt-2">Searching...</Text>
         </View>
       ) : (
         <FlatList
@@ -288,8 +255,8 @@ export default function SearchScreen() {
           onEndReachedThreshold={0.5}
           contentContainerStyle={{ paddingBottom: 48 }}
           ListEmptyComponent={
-            <View className="items-center justify-center py-tv-8">
-              <Text className="text-tv-base text-muted-foreground">
+            <View className="items-center justify-center py-12 px-6">
+              <Text className="text-base text-muted-foreground text-center">
                 {initialQuery
                   ? "No results found. Try a different search."
                   : "Enter a search query to find songs."}

@@ -11,6 +11,7 @@ import AVKit
 
 struct QueuePlayerView: View {
     @EnvironmentObject var queueService: QueueService
+    @EnvironmentObject var audioStreamService: AudioStreamService
     @StateObject private var viewModel: PlayerViewModel
     @Environment(\.dismiss) private var dismiss
     @FocusState private var focusedControl: FocusableControl?
@@ -131,6 +132,14 @@ struct QueuePlayerView: View {
                         .foregroundColor(.white.opacity(0.7))
                         .lineLimit(1)
                 }
+            }
+
+            // Mic level indicator
+            if audioStreamService.isReceiving {
+                MicLevelIndicator(
+                    level: audioStreamService.audioLevel,
+                    isReceiving: true
+                )
             }
 
             // Skip button

@@ -3,7 +3,7 @@
     "name": "KTV Singer",
     "slug": "ktv-singer",
     "version": "1.0.0",
-    "orientation": "landscape",
+    "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
@@ -26,7 +26,8 @@
         {
           "cameraPermission": "Allow KTV Singer to scan QR codes for TV pairing"
         }
-      ]
+      ],
+      "expo-audio"
     ],
     "web": {
       "bundler": "metro",

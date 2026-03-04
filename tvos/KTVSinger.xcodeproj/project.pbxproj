@@ -22,9 +22,11 @@
 		753B4F4E904112473E91503F /* APIError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14DDB28444B3EA41642CCE05 /* APIError.swift */; };
 		7AB83E55365371E8429C7636 /* LyricsSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CCD25ACB63D04CCC24D2982 /* LyricsSyncService.swift */; };
 		7BACFB9AF8197EE0F82B70B6 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = A5F64993CEC01C3B19A26EC4 /* Supabase */; };
+		84FFDFF6C99BC8517DEB3DC5 /* MicLevelIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F140FF50C201F6795B4BBDFC /* MicLevelIndicator.swift */; };
 		92981B7EFA3D0BDCD120A69C /* SocketIO in Frameworks */ = {isa = PBXBuildFile; productRef = B4F6B415090C4942A2796B12 /* SocketIO */; };
 		9A2D002B5E3DA17322C65B4A /* AuthenticationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9799C4F61443A751B5FAE4A /* AuthenticationView.swift */; };
 		B051CCDBFD2858052B7BEABB /* QueueEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F65539D042CC7AB8AD7AE57 /* QueueEntry.swift */; };
+		BFC43AC850966B8CEA3ACD02 /* AudioStreamService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D59014439210E54DC17AE39F /* AudioStreamService.swift */; };
 		D03946AD48BAB3AADFC0C211 /* KTVSingerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0BF10A32072B201D874BFF2 /* KTVSingerApp.swift */; };
 		D049FBB55116A037A13868A2 /* DevicePairingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35DD97D5B365D828A64CE641 /* DevicePairingService.swift */; };
 		D845F39E7032720DE2992DE4 /* SongBrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83D3BE68B31B254B7363745B /* SongBrowserView.swift */; };
@@ -53,7 +55,9 @@
 		C079225F143228A7055E1632 /* PairingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingView.swift; sourceTree = "<group>"; };
 		C9799C4F61443A751B5FAE4A /* AuthenticationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticationView.swift; sourceTree = "<group>"; };
 		D0BF10A32072B201D874BFF2 /* KTVSingerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KTVSingerApp.swift; sourceTree = "<group>"; };
+		D59014439210E54DC17AE39F /* AudioStreamService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioStreamService.swift; sourceTree = "<group>"; };
 		EC88BBE882CD4149BAF5CA9E /* SocketPairingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SocketPairingService.swift; sourceTree = "<group>"; };
+		F140FF50C201F6795B4BBDFC /* MicLevelIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicLevelIndicator.swift; sourceTree = "<group>"; };
 		FC836AEDD01F0D4DBEA8E058 /* SongBrowserViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SongBrowserViewModel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -192,6 +196,7 @@
 				58367762814EF6F7B3639A37 /* Models */,
 				9112D5FE9D1E4169A3EC45E8 /* Networking */,
 				DFCBC29B0988BE5F005E2EFE /* Services */,
+				9C6E922D5B6D3FBD0AE9315F /* Views */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -203,6 +208,14 @@
 				14DDB28444B3EA41642CCE05 /* APIError.swift */,
 			);
 			path = Networking;
+			sourceTree = "<group>";
+		};
+		9C6E922D5B6D3FBD0AE9315F /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				F140FF50C201F6795B4BBDFC /* MicLevelIndicator.swift */,
+			);
+			path = Views;
 			sourceTree = "<group>";
 		};
 		9E6CFF915089BAB22582B061 /* ViewModels */ = {
@@ -263,6 +276,7 @@
 		DFCBC29B0988BE5F005E2EFE /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				D59014439210E54DC17AE39F /* AudioStreamService.swift */,
 				35DD97D5B365D828A64CE641 /* DevicePairingService.swift */,
 				3EE461E7D4727BBE5F8D47F4 /* QueueService.swift */,
 			);
@@ -357,12 +371,14 @@
 			files = (
 				736A530EE928DFDDF639D8EF /* APIClient.swift in Sources */,
 				753B4F4E904112473E91503F /* APIError.swift in Sources */,
+				BFC43AC850966B8CEA3ACD02 /* AudioStreamService.swift in Sources */,
 				9A2D002B5E3DA17322C65B4A /* AuthenticationView.swift in Sources */,
 				5944ACD1EFE6A32BA16450FF /* DeviceConnection.swift in Sources */,
 				D049FBB55116A037A13868A2 /* DevicePairingService.swift in Sources */,
 				FF3804000606EFE6DD440F74 /* FavoritesView.swift in Sources */,
 				D03946AD48BAB3AADFC0C211 /* KTVSingerApp.swift in Sources */,
 				7AB83E55365371E8429C7636 /* LyricsSyncService.swift in Sources */,
+				84FFDFF6C99BC8517DEB3DC5 /* MicLevelIndicator.swift in Sources */,
 				6AF083A00151BDEC30C16B07 /* PairingView.swift in Sources */,
 				0CDE1BCA967CEA363D1C6A8B /* PlayerView.swift in Sources */,
 				EDC8E5F59BED9476BA2E9F42 /* PlayerViewModel.swift in Sources */,

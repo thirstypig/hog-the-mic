@@ -9,7 +9,7 @@
 // TODO: Read from an env var / Expo config plugin for production builds.
 // For local development, use your machine's LAN IP (not localhost) so that
 // the tvOS simulator / physical device can reach the Express server.
-let _baseUrl = "http://localhost:3000";
+let _baseUrl = "http://192.168.6.12:3000";
 
 export function setApiBaseUrl(url: string) {
   _baseUrl = url.replace(/\/+$/, "");

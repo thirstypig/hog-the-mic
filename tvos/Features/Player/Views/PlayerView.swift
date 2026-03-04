@@ -10,6 +10,7 @@ import SwiftUI
 import AVKit
 
 struct PlayerView: View {
+    @EnvironmentObject var audioStreamService: AudioStreamService
     @StateObject private var viewModel: PlayerViewModel
     @Environment(\.dismiss) private var dismiss
     @FocusState private var focusedControl: FocusableControl?
@@ -96,6 +97,14 @@ struct PlayerView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
 
             Spacer()
+
+            // Mic level indicator
+            if audioStreamService.isReceiving {
+                MicLevelIndicator(
+                    level: audioStreamService.audioLevel,
+                    isReceiving: true
+                )
+            }
 
             // Lyrics offset controls
             HStack(spacing: 16) {

@@ -1,154 +1,237 @@
-import { View, Text, Pressable, Platform, ScrollView } from "react-native";
+import { useState } from "react";
+import { View, Text, Pressable, Platform, TextInput } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { usePairing, QRScannerView, PairingStatus, useQueue } from "@features/pairing";
-import type { QueueEntry } from "@features/pairing";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { QRScannerView, connectSocket } from "@features/pairing";
+import { setApiBaseUrl } from "@common/lib/api";
+import type { RootStackParamList } from "@navigation/types";
+import type { PairedPayload } from "@features/pairing";
+
+type Nav = NativeStackNavigationProp<RootStackParamList, "Pair">;
+
+const DEFAULT_SERVER_URL = "http://192.168.6.12:3000";
+
+type Mode = "choose" | "scan" | "host";
 
 export default function PairScreen() {
-  const navigation = useNavigation();
-  const {
-    status,
-    sessionId,
-    serverURL,
-    sessionState,
-    errorMessage,
-    handleQRScanned,
-    disconnect,
-  } = usePairing();
-
-  const { currentlyPlaying, upcoming, skipSong, removeFromQueue } = useQueue();
+  const navigation = useNavigation<Nav>();
+  const insets = useSafeAreaInsets();
+  const [mode, setMode] = useState<Mode>("choose");
+  const [serverUrl, setServerUrl] = useState(DEFAULT_SERVER_URL);
+  const [statusText, setStatusText] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const handleBack = () => {
-    disconnect();
     navigation.goBack();
   };
 
+  /** QR scanned — connect as singer, then navigate to Session tabs */
+  const handleQRScanned = async (qrData: string) => {
+    try {
+      const payload = JSON.parse(qrData);
+      if (!payload.serverURL || !payload.sessionId) {
+        setError("Invalid QR code");
+        return;
+      }
+
+      setStatusText("Connecting...");
+      setApiBaseUrl(payload.serverURL);
+      const socket = connectSocket(payload.serverURL);
+
+      socket.on("connect", () => {
+        const deviceName =
+          Platform.OS === "ios" ? "iPhone" : Platform.OS === "android" ? "Android" : "Device";
+        socket.emit("join_session", {
+          sessionId: payload.sessionId,
+          role: "singer" as const,
+          deviceName,
+        });
+      });
+
+      socket.on("paired", (_data: PairedPayload) => {
+        navigation.replace("Session");
+      });
+
+      socket.on("error", (err: { message: string }) => {
+        setError(err.message);
+        setStatusText(null);
+      });
+
+      socket.on("connect_error", () => {
+        setError("Could not connect to server");
+        setStatusText(null);
+      });
+    } catch {
+      setError("Invalid QR code format");
+    }
+  };
+
+  /** Host mode — create a session, connect, then navigate to Session tabs */
+  const handleHost = async () => {
+    try {
+      setError(null);
+      setStatusText("Creating session...");
+
+      const res = await fetch(`${serverUrl}/api/pairing/sessions`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error("Failed to create session");
+
+      const { sessionId } = await res.json();
+      setStatusText("Connecting...");
+      setApiBaseUrl(serverUrl);
+
+      const socket = connectSocket(serverUrl);
+
+      socket.on("connect", () => {
+        const deviceName =
+          Platform.OS === "ios" ? "iPhone" : Platform.OS === "android" ? "Android" : "Device";
+        socket.emit("join_session", {
+          sessionId,
+          role: "singer" as const,
+          deviceName,
+        });
+      });
+
+      socket.on("paired", (_data: PairedPayload) => {
+        navigation.replace("Session");
+      });
+
+      socket.on("error", (err: { message: string }) => {
+        setError(err.message);
+        setStatusText(null);
+      });
+
+      socket.on("connect_error", () => {
+        setError("Could not connect to server");
+        setStatusText(null);
+      });
+    } catch {
+      setError("Failed to create session");
+      setStatusText(null);
+    }
+  };
+
   return (
-    <View className="flex-1 bg-background">
+    <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       {/* Header */}
       <View className="flex-row items-center px-4 py-3 border-b border-border">
         <Pressable
           className="px-4 py-2 rounded-lg bg-muted"
-          onPress={handleBack}
-          {...(Platform.isTV && { isTVSelectable: true })}
+          onPress={mode === "choose" ? handleBack : () => { setMode("choose"); setError(null); setStatusText(null); }}
         >
-          <Text className="text-foreground">Back</Text>
+          <Text className="text-foreground">
+            {mode === "choose" ? "Back" : "Cancel"}
+          </Text>
         </Pressable>
         <Text className="text-lg text-foreground font-bold ml-4">
-          Connect to TV
+          {mode === "choose" ? "Connect" : mode === "scan" ? "Scan QR Code" : "Host Session"}
         </Text>
       </View>
 
-      {/* Content */}
-      {status === "idle" || status === "scanning" ? (
-        <View className="flex-1">
-          <View className="px-4 py-3">
-            <Text className="text-muted-foreground text-center">
-              Point your camera at the QR code on your TV
+      {/* Choose mode */}
+      {mode === "choose" && (
+        <View className="flex-1 items-center justify-center px-6">
+          <Text className="text-foreground text-xl font-bold mb-2">
+            Start Karaoke
+          </Text>
+          <Text className="text-muted-foreground text-center mb-8">
+            Host a session for others to join, or scan a TV's QR code
+          </Text>
+
+          <Pressable
+            className="w-full bg-primary rounded-xl py-4 px-6 mb-4"
+            onPress={() => setMode("host")}
+          >
+            <Text className="text-primary-foreground text-center font-bold text-lg">
+              Host a Session
             </Text>
-          </View>
-          <QRScannerView onScanned={handleQRScanned} />
+            <Text className="text-primary-foreground/70 text-center text-sm mt-1">
+              Create a session and invite others
+            </Text>
+          </Pressable>
+
+          <Pressable
+            className="w-full bg-card border border-border rounded-xl py-4 px-6"
+            onPress={() => setMode("scan")}
+          >
+            <Text className="text-foreground text-center font-bold text-lg">
+              Scan QR Code
+            </Text>
+            <Text className="text-muted-foreground text-center text-sm mt-1">
+              Join an existing session from a TV
+            </Text>
+          </Pressable>
         </View>
-      ) : status === "paired" ? (
-        <ScrollView className="flex-1 px-4 py-3">
-          {/* Pairing status */}
-          <PairingStatus
-            status={status}
-            sessionId={sessionId}
-            singerCount={sessionState?.singers.length ?? 0}
-            errorMessage={errorMessage}
-            onDisconnect={disconnect}
+      )}
+
+      {/* Scan mode */}
+      {mode === "scan" && (
+        <View className="flex-1">
+          {statusText ? (
+            <View className="flex-1 items-center justify-center">
+              <Text className="text-foreground text-lg">{statusText}</Text>
+            </View>
+          ) : error ? (
+            <View className="flex-1 items-center justify-center px-6">
+              <Text className="text-destructive text-center mb-4">{error}</Text>
+              <Pressable
+                className="px-6 py-3 bg-muted rounded-lg"
+                onPress={() => setError(null)}
+              >
+                <Text className="text-foreground">Try Again</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <>
+              <View className="px-4 py-3">
+                <Text className="text-muted-foreground text-center">
+                  Point your camera at the QR code on your TV
+                </Text>
+              </View>
+              <QRScannerView onScanned={handleQRScanned} />
+            </>
+          )}
+        </View>
+      )}
+
+      {/* Host mode */}
+      {mode === "host" && (
+        <View className="flex-1 px-6 pt-8">
+          <Text className="text-foreground font-bold text-base mb-2">
+            Server URL
+          </Text>
+          <TextInput
+            className="bg-card border border-border rounded-lg px-4 py-3 text-foreground mb-6"
+            value={serverUrl}
+            onChangeText={setServerUrl}
+            placeholder="http://192.168.x.x:3000"
+            placeholderTextColor="#a3a3a3"
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="url"
           />
 
-          {/* Share QR for others to join */}
-          {sessionId && serverURL && (
-            <View className="mt-4 p-4 bg-card rounded-xl border border-border items-center">
-              <Text className="text-foreground font-bold text-base mb-2">
-                Invite Others
-              </Text>
-              <Text className="text-muted-foreground text-sm text-center mb-3">
-                Have friends scan this screen's QR code from their phone to join the session
-              </Text>
-              <View className="bg-white p-3 rounded-lg">
-                <Text className="text-black text-xs text-center font-mono">
-                  Session: {sessionId.slice(0, 8)}...
-                </Text>
-              </View>
-              <Text className="text-muted-foreground text-xs mt-2">
-                Or open KTV Singer app and scan the TV's QR code
-              </Text>
-            </View>
+          {error && (
+            <Text className="text-destructive text-center mb-4">{error}</Text>
           )}
 
-          {/* Now Playing */}
-          {currentlyPlaying && (
-            <View className="mt-4 p-4 bg-card rounded-xl border border-border">
-              <View className="flex-row items-center justify-between mb-2">
-                <Text className="text-foreground font-bold text-base">
-                  Now Playing
-                </Text>
-                <Pressable
-                  className="px-3 py-1.5 rounded-lg bg-muted"
-                  onPress={skipSong}
-                >
-                  <Text className="text-foreground text-sm">Skip</Text>
-                </Pressable>
-              </View>
-              <Text className="text-foreground text-sm font-semibold" numberOfLines={1}>
-                {currentlyPlaying.title}
-              </Text>
-              <Text className="text-muted-foreground text-xs" numberOfLines={1}>
-                {currentlyPlaying.artist} — added by {currentlyPlaying.addedBy}
-              </Text>
+          {statusText ? (
+            <View className="items-center py-6">
+              <Text className="text-foreground text-lg">{statusText}</Text>
             </View>
-          )}
-
-          {/* Up Next */}
-          {upcoming.length > 0 && (
-            <View className="mt-4">
-              <Text className="text-foreground font-bold text-base mb-2">
-                Up Next ({upcoming.length})
+          ) : (
+            <Pressable
+              className="bg-primary rounded-xl py-4"
+              onPress={handleHost}
+            >
+              <Text className="text-primary-foreground text-center font-bold text-lg">
+                Create Session
               </Text>
-              {upcoming.map((entry: QueueEntry) => (
-                <View
-                  key={entry.queueId}
-                  className="flex-row items-center p-3 bg-card rounded-lg border border-border mb-2"
-                >
-                  <View className="flex-1">
-                    <Text className="text-foreground text-sm font-semibold" numberOfLines={1}>
-                      {entry.title}
-                    </Text>
-                    <Text className="text-muted-foreground text-xs" numberOfLines={1}>
-                      {entry.artist} — {entry.addedBy}
-                    </Text>
-                  </View>
-                  <Pressable
-                    className="px-2 py-1 rounded bg-muted ml-2"
-                    onPress={() => removeFromQueue(entry.queueId)}
-                  >
-                    <Text className="text-muted-foreground text-xs">Remove</Text>
-                  </Pressable>
-                </View>
-              ))}
-            </View>
+            </Pressable>
           )}
-
-          {/* Empty queue state */}
-          {!currentlyPlaying && upcoming.length === 0 && (
-            <View className="mt-6 items-center">
-              <Text className="text-muted-foreground text-sm text-center">
-                No songs in queue. Go to Search to add songs!
-              </Text>
-            </View>
-          )}
-        </ScrollView>
-      ) : (
-        <PairingStatus
-          status={status}
-          sessionId={sessionId}
-          singerCount={sessionState?.singers.length ?? 0}
-          errorMessage={errorMessage}
-          onDisconnect={disconnect}
-        />
+        </View>
       )}
     </View>
   );
