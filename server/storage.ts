@@ -11,12 +11,11 @@ import {
   type PlaylistSong,
 } from "@shared/schema";
 
-// Feature storage imports
-import * as authStorage from "./features/auth/auth.storage";
-import * as songsStorage from "./features/songs/songs.storage";
-import * as scoringStorage from "./features/scoring/scoring.storage";
-import * as playsStorage from "./features/scoring/plays.storage";
-import * as playlistStorage from "./features/playlist/playlist.storage";
+// Feature storage imports — always import through barrel exports
+import * as authStorage from "./features/auth";
+import * as songsStorage from "./features/songs";
+import * as scoringStorage from "./features/scoring";
+import * as playlistStorage from "./features/playlist";
 
 export interface IStorage {
   // User operations
@@ -92,15 +91,15 @@ export class DatabaseStorage implements IStorage {
 
   // User-specific play tracking — delegate to scoring feature
   async incrementUserSongPlay(userId: string, songId: string): Promise<UserSongPlay> {
-    return playsStorage.incrementUserSongPlay(userId, songId);
+    return scoringStorage.incrementUserSongPlay(userId, songId);
   }
 
   async getUserSongPlay(userId: string, songId: string): Promise<UserSongPlay | undefined> {
-    return playsStorage.getUserSongPlay(userId, songId);
+    return scoringStorage.getUserSongPlay(userId, songId);
   }
 
   async getUserSongPlays(userId: string): Promise<UserSongPlay[]> {
-    return playsStorage.getUserSongPlays(userId);
+    return scoringStorage.getUserSongPlays(userId);
   }
 
   // Performance operations — delegate to scoring feature

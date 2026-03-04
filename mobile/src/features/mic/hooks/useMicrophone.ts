@@ -6,7 +6,7 @@ import {
   setAudioModeAsync,
 } from "expo-audio";
 import { File as ExpoFile } from "expo-file-system";
-import { getSocket } from "@features/pairing/utils/socketClient";
+import { getSocket } from "@features/pairing";
 import type { MicStatus } from "../types/mic.types";
 
 const CHUNK_DURATION_MS = 500;

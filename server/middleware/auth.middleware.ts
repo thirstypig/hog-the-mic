@@ -1,6 +1,6 @@
 import * as client from "openid-client";
 import type { RequestHandler } from "express";
-import { getOidcConfig, updateUserSession } from "../features/auth/auth.setup";
+import { getOidcConfig, updateUserSession } from "../features/auth";
 
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
   const user = req.user as any;
