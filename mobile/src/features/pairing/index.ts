@@ -4,7 +4,7 @@ export { useQueue } from "./hooks/useQueue";
 export { QRScannerView } from "./components/QRScannerView";
 export { PairingStatus } from "./components/PairingStatus";
 export { PairingProvider, usePairingContext } from "./context/PairingContext";
-export { connectSocket, disconnectSocket, getSocket } from "./utils/socketClient";
+export { connectSocket, disconnectSocket, getSocket, onSocketChange } from "./utils/socketClient";
 export type {
   QRPayload,
   PairedPayload,

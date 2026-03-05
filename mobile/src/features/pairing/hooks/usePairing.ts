@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Platform } from "react-native";
-import { connectSocket, disconnectSocket, getSocket } from "../utils/socketClient";
+import { connectSocket, disconnectSocket, getSocket, onSocketChange } from "../utils/socketClient";
 import type {
   QRPayload,
   PairingStatus,
@@ -9,21 +9,25 @@ import type {
 } from "../types/pairing.types";
 
 export function usePairing() {
-  const [status, setStatus] = useState<PairingStatus>("idle");
+  const [status, setStatus] = useState<PairingStatus>(() => {
+    const s = getSocket();
+    return s?.connected ? "paired" : "idle";
+  });
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [serverURL, setServerURL] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [sessionState, setSessionState] = useState<SessionStatePayload | null>(
     null,
   );
-  const cleanupRef = useRef(false);
 
-  // Clean up on unmount
+  // Track socket changes reactively (no destructive cleanup)
   useEffect(() => {
-    return () => {
-      cleanupRef.current = true;
-      disconnectSocket();
-    };
+    return onSocketChange((s) => {
+      if (!s) {
+        setStatus("idle");
+        setSessionState(null);
+      }
+    });
   }, []);
 
   /** Handle a scanned QR code result */
@@ -43,9 +47,6 @@ export function usePairing() {
       const socket = connectSocket(payload.serverURL);
 
       socket.on("connect", () => {
-        if (cleanupRef.current) return;
-
-        // Join the session as a singer
         const deviceName =
           Platform.OS === "ios" ? "iPhone" : Platform.OS === "android" ? "Android" : "Device";
         socket.emit("join_session", {
@@ -56,30 +57,25 @@ export function usePairing() {
       });
 
       socket.on("paired", (data: PairedPayload) => {
-        if (cleanupRef.current) return;
         setStatus("paired");
         setSessionId(data.sessionId);
       });
 
       socket.on("session_state", (state: SessionStatePayload) => {
-        if (cleanupRef.current) return;
         setSessionState(state);
       });
 
       socket.on("error", (err: { message: string }) => {
-        if (cleanupRef.current) return;
         setStatus("error");
         setErrorMessage(err.message);
       });
 
       socket.on("connect_error", () => {
-        if (cleanupRef.current) return;
         setStatus("error");
         setErrorMessage("Could not connect to server");
       });
 
       socket.on("disconnect", () => {
-        if (cleanupRef.current) return;
         setStatus("idle");
         setSessionState(null);
       });
@@ -106,7 +102,6 @@ export function usePairing() {
       const socket = connectSocket(serverBaseUrl);
 
       socket.on("connect", () => {
-        if (cleanupRef.current) return;
         const deviceName =
           Platform.OS === "ios" ? "iPhone" : Platform.OS === "android" ? "Android" : "Device";
         socket.emit("join_session", {
@@ -117,30 +112,25 @@ export function usePairing() {
       });
 
       socket.on("paired", (data: PairedPayload) => {
-        if (cleanupRef.current) return;
         setStatus("paired");
         setSessionId(data.sessionId);
       });
 
       socket.on("session_state", (state: SessionStatePayload) => {
-        if (cleanupRef.current) return;
         setSessionState(state);
       });
 
       socket.on("error", (err: { message: string }) => {
-        if (cleanupRef.current) return;
         setStatus("error");
         setErrorMessage(err.message);
       });
 
       socket.on("connect_error", () => {
-        if (cleanupRef.current) return;
         setStatus("error");
         setErrorMessage("Could not connect to server");
       });
 
       socket.on("disconnect", () => {
-        if (cleanupRef.current) return;
         setStatus("idle");
         setSessionState(null);
       });

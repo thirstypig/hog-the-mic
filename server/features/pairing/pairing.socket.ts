@@ -173,6 +173,7 @@ export function setupPairingSocket(httpServer: Server, sessionStore: SessionStor
         socket.join(room);
 
         // Confirm to the joining client
+        console.log(`[pairing] ${role} joined session ${sessionId} (socket: ${socket.id}, device: ${deviceName})`);
         socket.emit("paired", { sessionId, role });
 
         // Notify the room about the new singer
@@ -200,6 +201,7 @@ export function setupPairingSocket(httpServer: Server, sessionStore: SessionStor
       try {
         if (!checkRate(socket.id, "add_to_queue")) return;
         const info = socketSessionMap.get(socket.id);
+        console.log(`[pairing] add_to_queue from ${socket.id}, info:`, info ? `session=${info.sessionId}, role=${info.role}` : "NOT IN SESSION");
         if (!info) return;
 
         // Validate payload
@@ -251,6 +253,7 @@ export function setupPairingSocket(httpServer: Server, sessionStore: SessionStor
         if (!session.currentlyPlaying && session.queue.length === 0) {
           session.currentlyPlaying = entry;
           await sessionStore.update(session);
+          console.log(`[pairing] play_song emitted to session:${info.sessionId} — ${entry.title} by ${entry.artist}`);
           pairing.to(`session:${info.sessionId}`).emit("play_song", {
             sessionId: info.sessionId,
             entry,
@@ -258,6 +261,7 @@ export function setupPairingSocket(httpServer: Server, sessionStore: SessionStor
         } else {
           session.queue.push(entry);
           await sessionStore.update(session);
+          console.log(`[pairing] song queued in session:${info.sessionId} — ${entry.title} (queue size: ${session.queue.length})`);
         }
 
         await emitQueueUpdated(info.sessionId);

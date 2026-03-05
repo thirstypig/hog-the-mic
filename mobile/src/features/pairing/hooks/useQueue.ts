@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { getSocket } from "../utils/socketClient";
+import { getSocket, onSocketChange } from "../utils/socketClient";
+import type { Socket } from "socket.io-client";
 
 export interface QueueEntry {
   queueId: string;
@@ -23,10 +24,18 @@ export function useQueue() {
     currentlyPlaying: null,
     upcoming: [],
   });
+  const [currentSocket, setCurrentSocket] = useState<Socket | null>(getSocket);
 
+  // Track socket availability reactively
   useEffect(() => {
-    const socket = getSocket();
-    if (!socket) return;
+    return onSocketChange((s) => {
+      setCurrentSocket(s);
+    });
+  }, []);
+
+  // Register queue listeners whenever socket changes
+  useEffect(() => {
+    if (!currentSocket) return;
 
     const handleQueueUpdated = (data: {
       currentlyPlaying: QueueEntry | null;
@@ -45,14 +54,14 @@ export function useQueue() {
       }));
     };
 
-    socket.on("queue_updated", handleQueueUpdated);
-    socket.on("play_song", handlePlaySong);
+    currentSocket.on("queue_updated", handleQueueUpdated);
+    currentSocket.on("play_song", handlePlaySong);
 
     return () => {
-      socket.off("queue_updated", handleQueueUpdated);
-      socket.off("play_song", handlePlaySong);
+      currentSocket.off("queue_updated", handleQueueUpdated);
+      currentSocket.off("play_song", handlePlaySong);
     };
-  }, []);
+  }, [currentSocket]);
 
   const addToQueue = useCallback(
     (song: {
@@ -88,9 +97,8 @@ export function useQueue() {
   }, []);
 
   const isPaired = useMemo(() => {
-    const socket = getSocket();
-    return socket?.connected ?? false;
-  }, [queueState]); // re-evaluate when queue state changes (proxy for connection)
+    return currentSocket?.connected ?? false;
+  }, [currentSocket]);
 
   const isQueueFull = useMemo(() => {
     const total =
