@@ -1,12 +1,16 @@
 import { useState, useCallback } from "react";
 import { Platform } from "react-native";
 import { connectSocket, disconnectSocket, getSocket } from "../utils/socketClient";
+import type { Socket } from "socket.io-client";
 import type {
   QRPayload,
   PairingStatus,
   SessionStatePayload,
   PairedPayload,
 } from "../types/pairing.types";
+
+const deviceName =
+  Platform.OS === "ios" ? "iPhone" : Platform.OS === "android" ? "Android" : "Device";
 
 export function usePairing() {
   const [status, setStatus] = useState<PairingStatus>(() => {
@@ -24,6 +28,41 @@ export function usePairing() {
   // PairingProvider stays mounted for the entire session, so there is no
   // unmount-triggered teardown needed.
 
+  /** Attach shared socket event listeners (paired, session_state, error, etc.) */
+  function attachSocketListeners(socket: Socket, targetSessionId: string) {
+    socket.on("connect", () => {
+      socket.emit("join_session", {
+        sessionId: targetSessionId,
+        role: "singer" as const,
+        deviceName,
+      });
+    });
+
+    socket.on("paired", (data: PairedPayload) => {
+      setStatus("paired");
+      setSessionId(data.sessionId);
+    });
+
+    socket.on("session_state", (state: SessionStatePayload) => {
+      setSessionState(state);
+    });
+
+    socket.on("error", (err: { message: string }) => {
+      setStatus("error");
+      setErrorMessage(err.message);
+    });
+
+    socket.on("connect_error", () => {
+      setStatus("error");
+      setErrorMessage("Could not connect to server");
+    });
+
+    socket.on("disconnect", () => {
+      setStatus("idle");
+      setSessionState(null);
+    });
+  }
+
   /** Handle a scanned QR code result */
   const handleQRScanned = useCallback(async (qrData: string) => {
     try {
@@ -39,40 +78,7 @@ export function usePairing() {
       setSessionId(payload.sessionId);
 
       const socket = connectSocket(payload.serverURL);
-
-      socket.on("connect", () => {
-        const deviceName =
-          Platform.OS === "ios" ? "iPhone" : Platform.OS === "android" ? "Android" : "Device";
-        socket.emit("join_session", {
-          sessionId: payload.sessionId,
-          role: "singer" as const,
-          deviceName,
-        });
-      });
-
-      socket.on("paired", (data: PairedPayload) => {
-        setStatus("paired");
-        setSessionId(data.sessionId);
-      });
-
-      socket.on("session_state", (state: SessionStatePayload) => {
-        setSessionState(state);
-      });
-
-      socket.on("error", (err: { message: string }) => {
-        setStatus("error");
-        setErrorMessage(err.message);
-      });
-
-      socket.on("connect_error", () => {
-        setStatus("error");
-        setErrorMessage("Could not connect to server");
-      });
-
-      socket.on("disconnect", () => {
-        setStatus("idle");
-        setSessionState(null);
-      });
+      attachSocketListeners(socket, payload.sessionId);
     } catch {
       setStatus("error");
       setErrorMessage("Invalid QR code format");
@@ -94,40 +100,7 @@ export function usePairing() {
       setSessionId(newSessionId);
 
       const socket = connectSocket(serverBaseUrl);
-
-      socket.on("connect", () => {
-        const deviceName =
-          Platform.OS === "ios" ? "iPhone" : Platform.OS === "android" ? "Android" : "Device";
-        socket.emit("join_session", {
-          sessionId: newSessionId,
-          role: "singer" as const,
-          deviceName,
-        });
-      });
-
-      socket.on("paired", (data: PairedPayload) => {
-        setStatus("paired");
-        setSessionId(data.sessionId);
-      });
-
-      socket.on("session_state", (state: SessionStatePayload) => {
-        setSessionState(state);
-      });
-
-      socket.on("error", (err: { message: string }) => {
-        setStatus("error");
-        setErrorMessage(err.message);
-      });
-
-      socket.on("connect_error", () => {
-        setStatus("error");
-        setErrorMessage("Could not connect to server");
-      });
-
-      socket.on("disconnect", () => {
-        setStatus("idle");
-        setSessionState(null);
-      });
+      attachSocketListeners(socket, newSessionId);
     } catch {
       setStatus("error");
       setErrorMessage("Failed to create session");
