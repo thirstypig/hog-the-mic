@@ -10,7 +10,7 @@ import type { PairedPayload } from "@features/pairing";
 
 type Nav = NativeStackNavigationProp<RootStackParamList, "Pair">;
 
-const DEFAULT_SERVER_URL = "http://192.168.6.12:3000";
+const DEFAULT_SERVER_URL = "http://192.168.6.12:4040";
 
 type Mode = "choose" | "scan" | "host";
 
@@ -206,7 +206,7 @@ export default function PairScreen() {
             className="bg-card border border-border rounded-lg px-4 py-3 text-foreground mb-6"
             value={serverUrl}
             onChangeText={setServerUrl}
-            placeholder="http://192.168.x.x:3000"
+            placeholder="http://192.168.x.x:4040"
             placeholderTextColor="#a3a3a3"
             autoCapitalize="none"
             autoCorrect={false}

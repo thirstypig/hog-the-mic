@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "main": "index.ts",
   "scripts": {
-    "start": "expo start",
-    "web": "expo start --web",
+    "start": "expo start --port 3040",
+    "web": "expo start --web --port 3040",
     "ios": "expo run:ios",
     "android": "expo run:android",
     "check": "tsc --noEmit"

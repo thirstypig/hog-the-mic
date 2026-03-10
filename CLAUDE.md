@@ -17,7 +17,7 @@ YouTube-powered karaoke monorepo: Express API server + React Native mobile clien
 ### Server (run from project root)
 
 ```bash
-npm run dev:server      # Dev server with hot reload (port 3000)
+npm run dev:server      # Dev server with hot reload (port 4040)
 npm run check:server    # TypeScript type check (use this to verify changes)
 npm run build:server    # Production bundle (esbuild)
 npm run db:push         # Push Drizzle schema to Supabase PostgreSQL
@@ -26,7 +26,7 @@ npm run db:push         # Push Drizzle schema to Supabase PostgreSQL
 ### Mobile (run from mobile/)
 
 ```bash
-npm start               # Expo dev server
+npm start               # Expo dev server (port 3040)
 npm run ios             # iOS simulator
 npm run check           # TypeScript type check
 ```
@@ -146,6 +146,7 @@ Mobile features: auth, library, player, playlist, scoring, search, vocal-separat
 - **tvOS uses `AppSupabaseClient` (not `SupabaseClient`)** to avoid naming conflict with the Supabase SDK's own `SupabaseClient` class.
 - **tvOS APIClient base URL** is hardcoded to a local IP. When changing networks, update `tvos/Shared/Networking/APIClient.swift` default URL or change it in-app via Settings.
 - **Use `npx tsc --noEmit` instead of `npm run check:server`** for server type checking (`tsconfig.server.json` doesn't exist).
+- **Port assignments**: See `PORTS.md` for this project's port assignments. Express API runs on port **4040** (default), Socket.IO shares the same port. No separate frontend server.
 
 ## tvOS Architecture Notes
 

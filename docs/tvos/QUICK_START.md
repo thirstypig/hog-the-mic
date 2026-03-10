@@ -5,19 +5,19 @@
 - **Xcode 15+** (with tvOS SDK)
 - **XcodeGen**: `brew install xcodegen`
 - **Node.js 20+** (for the Express server)
-- **Express server running** at `http://localhost:3000` (or your Mac's local IP)
+- **Express server running** at `http://localhost:4040` (or your Mac's local IP)
 
 ## 1. Start the Server
 
 ```bash
 # From project root
 npm install          # first time only
-npm run dev:server   # starts on port 3000
+npm run dev:server   # starts on port 4040
 ```
 
 Verify it works:
 ```bash
-curl http://localhost:3000/api/songs
+curl http://localhost:4040/api/songs
 # Should return JSON array of songs
 ```
 
@@ -54,11 +54,11 @@ In Xcode:
 4. If bundle ID conflicts, change `PRODUCT_BUNDLE_IDENTIFIER` in `project.yml` and regenerate
 
 ### Update Server URL
-The app defaults to `http://192.168.6.12:3000`. Update for your network:
+The app defaults to `http://192.168.6.12:4040`. Update for your network:
 
 Edit `tvos/Shared/Networking/APIClient.swift`, line ~37:
 ```swift
-?? "http://YOUR_MAC_IP:3000"
+?? "http://YOUR_MAC_IP:4040"
 ```
 
 Then regenerate and rebuild.
@@ -76,22 +76,28 @@ Then regenerate and rebuild.
 tvos/
 ├── project.yml                    # XcodeGen spec (edit this, not .pbxproj)
 ├── KTVSinger.xcodeproj/          # Generated — do not hand-edit
-├── KTVSingerApp.swift            # App entry point, TabView (Browse/Favorites/Settings)
+├── KTVSingerApp.swift            # App entry point, AVAudioSession config
 ├── Info.plist                    # Generated
 ├── Shared/
 │   ├── Models/
 │   │   ├── Song.swift            # Song + LyricLine (matches server schema)
+│   │   ├── QueueEntry.swift      # Queue entry for shared song queue
 │   │   └── DeviceConnection.swift
 │   ├── Database/
 │   │   └── SupabaseClient.swift  # AppSupabaseClient — auth only
 │   ├── Networking/
-│   │   ├── APIClient.swift       # HTTP client for Express API
+│   │   ├── APIClient.swift       # HTTP client for Express API (port 4040)
 │   │   └── APIError.swift
 │   └── Services/
-│       └── DevicePairingService.swift
+│       ├── DevicePairingService.swift
+│       ├── SocketPairingService.swift  # Socket.IO connection
+│       ├── QueueService.swift          # Song queue state via Socket.IO
+│       └── AudioStreamService.swift    # Mic audio playback from phones
 └── Features/
     ├── Player/
-    │   ├── Views/PlayerView.swift
+    │   ├── Views/
+    │   │   ├── PlayerView.swift
+    │   │   └── QueuePlayerView.swift   # Queue-driven player with auto-advance
     │   ├── ViewModels/PlayerViewModel.swift
     │   └── Services/
     │       ├── YouTubePlayerService.swift  # AVPlayer + stream URL
@@ -99,10 +105,10 @@ tvos/
     ├── SongBrowser/
     │   ├── Views/SongBrowserView.swift
     │   └── ViewModels/SongBrowserViewModel.swift
+    ├── Pairing/Views/PairingView.swift     # QR code display, session creation
     ├── Favorites/Views/FavoritesView.swift
     ├── Settings/Views/SettingsView.swift
-    ├── Authentication/Views/AuthenticationView.swift
-    └── Pairing/Views/PairingView.swift
+    └── Authentication/Views/AuthenticationView.swift
 ```
 
 ## Key APIs
@@ -111,8 +117,11 @@ tvos/
 |----------|---------|
 | `GET /api/songs` | Fetch all songs |
 | `GET /api/songs/:id` | Fetch single song |
-| `GET /api/youtube/stream/:videoId` | Extract playable stream URL |
+| `GET /api/youtube/stream/:videoId` | Extract playable stream URL (yt-dlp) |
 | `GET /api/youtube/search?q=...` | Search YouTube |
+| `POST /api/pairing/sessions` | Create a pairing session (TV role) |
+| `GET /api/pairing/sessions/:id` | Get session state |
+| Socket.IO `/pairing` namespace | Real-time queue, pairing, audio relay |
 
 ## Common Issues
 
@@ -122,7 +131,7 @@ tvos/
 | Song cards don't respond to remote | Must use `Button`, not `.onTapGesture` (tvOS focus engine) |
 | "Untrusted Developer" on Apple TV | Settings → General → Device Management → Trust |
 | No songs appear | Check Express server is running, check APIClient base URL |
-| Video plays but no audio | Known issue with ytdl-core format selection |
+| Video plays but no audio | Check AVAudioSession config in KTVSingerApp.swift |
 | Build error about code signing | Set `CODE_SIGN_STYLE: Automatic` in project.yml, regenerate |
 
 ## Architecture
@@ -130,9 +139,9 @@ tvos/
 ```
 tvOS App
   │
-  ├── APIClient ──→ Express Server (localhost:3000)
+  ├── APIClient ──→ Express Server (localhost:4040)
   │                    ├── GET /api/songs ──→ Supabase PostgreSQL
-  │                    └── GET /api/youtube/stream/:id ──→ ytdl-core ──→ YouTube CDN
+  │                    └── GET /api/youtube/stream/:id ──→ yt-dlp ──→ YouTube CDN
   │
   ├── AppSupabaseClient ──→ Supabase Auth (optional, for favorites)
   │

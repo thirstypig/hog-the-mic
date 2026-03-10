@@ -1,52 +1,107 @@
 # KTV Singer
 
-YouTube-powered karaoke app with synced lyrics, scoring, playlists, and vocal separation. Monorepo with an Express API server, React Native mobile client, and an in-progress tvOS port.
+YouTube-powered karaoke system with real-time device pairing, synced lyrics, and a shared song queue. Monorepo with an Express API server, React Native mobile client, and native tvOS app.
 
-## Architecture
+## Tech Stack
 
-| Directory | Purpose | Tech |
-|-----------|---------|------|
-| `server/` | REST API, YouTube search, lyrics, scoring, auth, streaming | Express, Drizzle ORM, Supabase PostgreSQL, Passport.js, ytdl-core |
-| `mobile/` | iOS/Android/web client | Expo, React Native, NativeWind, React Navigation |
-| `tvos/` | Native Apple TV app (working MVP) | SwiftUI, AVPlayer, Supabase Auth |
-| `shared/` | Database schema shared between server and mobile | Drizzle ORM, Zod |
-| `docs/` | Extended documentation (tvOS setup, architecture) | Markdown |
+### Frontend (Mobile)
+
+- **Expo React Native** — iOS, Android, web
+- **React Navigation** — stack + bottom tab navigation
+- **NativeWind** — Tailwind CSS for React Native
+- **React Query** (`@tanstack/react-query`) — server state management
+- **expo-camera** — QR code scanning for device pairing
+- **expo-av** — microphone recording
+- **react-native-qrcode-svg** — QR code display for session hosting
+- **socket.io-client** — real-time pairing, queue sync, audio relay
+
+### Frontend (tvOS)
+
+- **SwiftUI** — tvOS 17.0+, XcodeGen for project generation
+- **AVPlayer** — YouTube video playback via server-extracted stream URLs
+- **Socket.IO Swift client** — real-time queue sync, audio relay
+- **Supabase Swift SDK** v2 — auth only (favorites with RLS)
+
+### Backend
+
+- **Node.js + Express** — TypeScript, ES modules
+- **Socket.IO** — real-time pairing, song queue, microphone audio relay
+- **Drizzle ORM** — type-safe database access (`postgres.js` driver)
+- **Passport.js** — optional Google OIDC authentication
+- **yt-dlp** — YouTube stream URL extraction (CLI, not npm package)
+- **Zod** — API input validation
+- **esbuild** — production bundler
+
+### Shared
+
+- **Drizzle ORM schemas** (`shared/schema/`) — songs, users, playlists, plays, performances, sessions
+- **Drizzle-Zod** — runtime validation generated from DB schema
+- **TypeScript strict mode** — enforced across all packages
+
+### Infrastructure
+
+- **Supabase PostgreSQL** — cloud-hosted, connected via `DATABASE_URL`
+- **Redis** — optional (`REDIS_URL`), falls back to in-memory in dev
+- **Express API on port 4040** — Socket.IO shares the same HTTP server
+- **Docker** — production deployment support (see `docs/deployment.md`)
+
+> See `PORTS.md` for this project's port assignments.
 
 ## Features
 
-- **YouTube search** — search and play karaoke videos via YouTube Data API
-- **Synced lyrics** — fetch from LRCLIB, display with word-level timing and user-adjustable offset
+- **Device pairing** — TV creates session, phone scans QR code, real-time Socket.IO sync
+- **Shared song queue** — phone searches and queues songs, TV auto-plays and advances
+- **YouTube playback** — server extracts stream URLs via yt-dlp, tvOS plays via AVPlayer
+- **Synced lyrics** — fetched from LRCLIB, displayed with word-level timing and adjustable offset
+- **Microphone streaming** — phone captures audio, relays to TV via Socket.IO
+- **YouTube search** — search karaoke videos via YouTube Data API
 - **Scoring** — track play history and performance scores
-- **Playlists** — create and manage song queues
+- **Playlists** — create and manage song collections
 - **Vocal separation** — isolate vocals/instrumentals via LaLaL.ai and Gaudio
 - **Auth** — Google OIDC via Passport.js (optional in dev)
-- **Device pairing** — QR code + Bonjour for tvOS ↔ iOS microphone input
+
+## Architecture
+
+```
+Phone (Expo)                    Apple TV (SwiftUI)
+  │                                │
+  ├─ REST ──────────┐  ┌──────── REST
+  ├─ Socket.IO ─────┤  ├─── Socket.IO
+  └─ Audio chunks ──┤  ├── Audio playback
+                    │  │
+              Express API (port 4040)
+              ├── /api/songs ──→ Supabase PostgreSQL
+              ├── /api/youtube/stream/:id ──→ yt-dlp ──→ YouTube CDN
+              ├── /api/pairing/* ──→ session management
+              └── Socket.IO /pairing ──→ queue, audio relay
+```
+
+**Design principle**: tvOS = clean video + lyrics display only. All search, queue management, and song discovery happens on the mobile device.
 
 ## Getting Started
 
 ### Prerequisites
 
 - Node.js 20+
-- PostgreSQL (Supabase recommended) with `DATABASE_URL` in `.env`
+- yt-dlp (`brew install yt-dlp`)
+- Supabase project with `DATABASE_URL`
 - YouTube Data API key (`YOUTUBE_API_KEY`)
 
 ### Setup
 
 ```bash
-# Install server dependencies
+# Install dependencies
 npm install
-
-# Install mobile dependencies
 cd mobile && npm install && cd ..
 
 # Push database schema
 npm run db:push
 
-# Start the dev server (API on port 3000)
+# Start the dev server (API on port 4040)
 npm run dev:server
 
 # In a separate terminal, start the mobile app
-cd mobile && npm start
+cd mobile && npm start   # Expo on port 3040
 ```
 
 ### Environment Variables
@@ -59,7 +114,18 @@ YOUTUBE_API_KEY=...
 SESSION_SECRET=...
 GOOGLE_CLIENT_ID=...       # optional in dev
 GOOGLE_CLIENT_SECRET=...   # optional in dev
+REDIS_URL=...              # optional, in-memory fallback
 ```
+
+## Monorepo Layout
+
+| Directory | Purpose |
+|-----------|---------|
+| `server/` | Express REST API + Socket.IO (pairing, queue, streaming, search, auth) |
+| `mobile/` | Expo React Native app (iOS, Android, web) |
+| `tvos/` | Native Apple TV app (SwiftUI, AVPlayer) |
+| `shared/` | Drizzle ORM schemas shared between server and mobile |
+| `docs/` | Extended documentation (tvOS setup, deployment) |
 
 ## Dev Commands
 
@@ -67,21 +133,26 @@ GOOGLE_CLIENT_SECRET=...   # optional in dev
 
 | Command | Description |
 |---------|-------------|
-| `npm run dev:server` | Start dev server with hot reload |
+| `npm run dev:server` | Start dev server with hot reload (port 4040) |
+| `npx tsc --noEmit` | TypeScript type check |
 | `npm run build:server` | Bundle for production (esbuild) |
-| `npm run start:server` | Run production build |
-| `npm run check:server` | TypeScript type check |
 | `npm run db:push` | Push Drizzle schema to database |
 
 ### Mobile (from `mobile/`)
 
 | Command | Description |
 |---------|-------------|
-| `npm start` | Start Expo dev server |
+| `npm start` | Start Expo dev server (port 3040) |
 | `npm run ios` | Run on iOS simulator |
-| `npm run android` | Run on Android emulator |
-| `npm run web` | Run in browser |
 | `npm run check` | TypeScript type check |
+| `npx expo run:ios --device <UDID>` | Build for physical iPhone |
+
+### tvOS (from `tvos/`)
+
+| Command | Description |
+|---------|-------------|
+| `xcodegen generate` | Regenerate Xcode project from `project.yml` |
+| Cmd+R in Xcode | Build and run on simulator or device |
 
 ## Project Structure
 
@@ -89,111 +160,80 @@ GOOGLE_CLIENT_SECRET=...   # optional in dev
 ktv-singer/
 ├── server/
 │   ├── features/
-│   │   ├── auth/           # Passport.js, Google OIDC, sessions
-│   │   ├── search/         # YouTube API, LRCLIB lyrics
-│   │   ├── songs/          # Song CRUD
-│   │   ├── playlist/       # Playlist management
-│   │   ├── scoring/        # Play tracking, performance scores
-│   │   └── vocal-separation/ # LaLaL.ai, Gaudio integration
-│   ├── middleware/          # Auth middleware
-│   ├── routes.ts            # Route registration
-│   ├── storage.ts           # Storage interface
-│   ├── db.ts                # Supabase/Drizzle connection
-│   └── index.ts             # Express app entry point
+│   │   ├── auth/              # Passport.js, Google OIDC, sessions
+│   │   ├── search/            # YouTube API, LRCLIB lyrics
+│   │   ├── songs/             # Song CRUD
+│   │   ├── playlist/          # Playlist management
+│   │   ├── scoring/           # Play tracking, performance scores
+│   │   ├── vocal-separation/  # LaLaL.ai, Gaudio integration
+│   │   ├── streaming/         # YouTube stream URL extraction (yt-dlp)
+│   │   └── pairing/           # Device pairing, song queue, Socket.IO
+│   ├── middleware/             # Auth middleware
+│   ├── routes.ts              # Route registration
+│   ├── storage.ts             # Storage interface
+│   ├── db.ts                  # Supabase/Drizzle connection
+│   └── index.ts               # Express app entry point
 ├── mobile/
 │   └── src/
-│       ├── features/        # Feature modules (same pattern as server)
-│       │   ├── auth/
-│       │   ├── library/
-│       │   ├── player/
-│       │   ├── playlist/
-│       │   ├── scoring/
-│       │   ├── search/
+│       ├── features/
+│       │   ├── auth/          # Auth context, login
+│       │   ├── library/       # Song library browsing
+│       │   ├── search/        # YouTube + LRCLIB search, genre pills
+│       │   ├── pairing/       # Socket client, pairing/queue hooks
+│       │   ├── mic/           # Microphone capture + streaming
+│       │   ├── playlist/      # Playlist management
+│       │   ├── scoring/       # Play tracking
 │       │   └── vocal-separation/
-│       ├── common/          # Shared components, hooks, utils
-│       ├── navigation/      # React Navigation config
-│       ├── screens/         # Screen components
-│       └── theme/           # NativeWind theme
-├── tvos/                    # Native tvOS port (SwiftUI)
-│   ├── Shared/              # Models, Database, Services
-│   └── Features/            # Player, SongBrowser, Auth, etc.
+│       ├── common/            # Shared components, hooks, utils, API client
+│       ├── navigation/        # React Navigation config
+│       ├── screens/           # Screen components
+│       └── theme/             # NativeWind theme, colors
+├── tvos/
+│   ├── Shared/                # Models, Networking, Database, Services
+│   └── Features/              # Player, SongBrowser, Pairing, Settings
 ├── shared/
-│   └── schema/              # Drizzle ORM schemas (songs, users, playlists, etc.)
-└── docs/
-    └── tvos/                # tvOS setup guides and architecture docs
+│   └── schema/                # Drizzle ORM table definitions
+└── docs/                      # tvOS guides, deployment docs
 ```
 
 ## Feature Module Pattern
 
 Both server and mobile use isolated feature modules:
 
-```
-features/<name>/
-├── components/     # UI (mobile only)
-├── hooks/          # React hooks (mobile only)
-├── types/          # TypeScript types
-├── utils/          # Feature-specific utilities
-├── <name>.routes.ts    # API routes (server only)
-├── <name>.storage.ts   # DB queries (server only)
-└── index.ts        # Barrel export (public API)
-```
-
-Each feature exports through `index.ts`. No cross-feature imports — features communicate through the server API or shared schema types.
+- Each feature exports through `index.ts` barrel file
+- No cross-feature imports (features only import from `@shared`, `@common`, or their own files)
+- Server features: `*.routes.ts`, `*.storage.ts`, types
+- Mobile features: `components/`, `hooks/`, `types/`, `utils/`
 
 ## tvOS App
 
-The tvOS app is a working MVP that runs on Apple TV Simulator and real Apple TV 4K hardware.
+Working MVP tested on Apple TV Simulator and real Apple TV 4K hardware.
 
-### What works
-- Song browser with search, genre filtering, and sorting
-- YouTube video playback via AVPlayer (server-side stream URL extraction)
-- Synced lyrics display with adjustable offset (+/- 0.5s)
+- Song queue driven by phone — TV auto-plays and advances
+- YouTube video playback via AVPlayer (server-extracted stream URLs)
+- Synced lyrics display with adjustable offset
+- QR code pairing with mobile devices
+- Microphone audio playback from paired phones
 - Favorites (requires Supabase auth)
-- Settings screen showing server connection status
-
-### tvOS Quick Start
-
-```bash
-# Prerequisites: Xcode 15+, XcodeGen (brew install xcodegen)
-
-# 1. Start the Express server (from project root)
-npm run dev:server
-
-# 2. Generate Xcode project (from tvos/)
-cd tvos && xcodegen generate
-
-# 3. Open in Xcode
-open KTVSinger.xcodeproj
-
-# 4. Select "Apple TV" simulator (or real device) and press Cmd+R
-```
 
 ### Testing on Real Apple TV
 
-1. **Pair** your Apple TV in Xcode → Window → Devices and Simulators
-2. **Sign** the app: select your team in Signing & Capabilities
-3. **Update server URL**: edit `tvos/Shared/Networking/APIClient.swift` default URL to your Mac's local IP (e.g., `http://192.168.x.x:3000`)
-4. **Build and run** (Cmd+R) with Apple TV selected as destination
-5. **Trust developer** on Apple TV: Settings → General → Device Management (first run only)
-6. Note: free developer accounts expire after 7 days — re-deploy from Xcode when needed
+1. **Pair** your Apple TV in Xcode (Window → Devices and Simulators)
+2. **Sign** the app (Signing & Capabilities → select your team)
+3. **Update server URL** in `tvos/Shared/Networking/APIClient.swift` to your Mac's LAN IP (e.g., `http://192.168.x.x:4040`), or change it in-app via Settings
+4. **Build and run** (Cmd+R) with Apple TV selected
+5. **Trust developer** on Apple TV (Settings → General → Device Management) on first run
 
-### tvOS Architecture
-
-```
-Apple TV → APIClient → Express Server → Supabase PostgreSQL (songs)
-                    → /api/youtube/stream/:videoId → ytdl-core → YouTube CDN → AVPlayer
-```
-
-The tvOS app does **not** query Supabase directly for songs. It uses the Express API as the single data source. Supabase on tvOS is auth-only (sign in, favorites with RLS).
+See `docs/tvos/QUICK_START.md` for detailed setup instructions.
 
 ## Project Status
 
 | Component | Status |
 |-----------|--------|
 | Server API | Working |
-| Mobile (Expo) | Working |
-| tvOS (SwiftUI) | Working MVP — tested on Simulator and Apple TV 4K |
-| Web client | Removed (was Vite+React, migrated to React Native) |
+| Mobile (Expo) | Working — pairing, queue, mic, search |
+| tvOS (SwiftUI) | Working MVP — playback, queue, lyrics, pairing |
+| Web client | Removed (migrated to React Native) |
 
 ## License
 

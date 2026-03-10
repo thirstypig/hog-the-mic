@@ -20,7 +20,7 @@ The KTV Singer server runs as a Docker container with:
 | `OIDC_CLIENT_ID` | No | Google OAuth client ID |
 | `OIDC_CLIENT_SECRET` | No | Google OAuth client secret |
 | `APP_URL` | No | Public URL for OAuth callbacks |
-| `PORT` | No | Server port (default: 3000) |
+| `PORT` | No | Server port (default: 4040) |
 | `NODE_ENV` | No | `production` or `development` |
 
 ## Railway
@@ -52,15 +52,15 @@ The KTV Singer server runs as a Docker container with:
 docker build -t ktv-singer .
 
 # Run (with external Redis)
-docker run -p 3000:3000 \
+docker run -p 4040:4040 \
   -e DATABASE_URL="..." \
-  -e REDIS_URL="redis://your-redis:6379" \
+  -e REDIS_URL="redis://your-redis:6385" \
   -e YOUTUBE_API_KEY="..." \
   -e SESSION_SECRET="..." \
   ktv-singer
 
 # Run (without Redis — in-memory, sessions lost on restart)
-docker run -p 3000:3000 \
+docker run -p 4040:4040 \
   -e DATABASE_URL="..." \
   -e YOUTUBE_API_KEY="..." \
   -e SESSION_SECRET="..." \

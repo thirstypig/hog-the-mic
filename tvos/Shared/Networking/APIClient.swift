@@ -21,7 +21,7 @@ final class APIClient: ObservableObject {
     static let shared = APIClient()
 
     /// Base URL for the Express server.
-    /// Defaults to localhost:3000 for development.
+    /// Defaults to localhost:4040 for development.
     /// On tvOS Simulator this reaches the Mac host.
     @Published var baseURL: String {
         didSet {
@@ -34,7 +34,7 @@ final class APIClient: ObservableObject {
 
     private init() {
         self.baseURL = UserDefaults.standard.string(forKey: "api_base_url")
-            ?? "http://192.168.6.12:3000"
+            ?? "http://192.168.6.12:4040"
 
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 30

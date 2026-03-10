@@ -17,3 +17,7 @@ tvos/KTVSinger.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
 tvos/KTVSinger.xcodeproj/project.xcworkspace/xcuserdata/
 tvos/KTVSinger.xcodeproj/xcuserdata/
 tvos/Package.resolved
+
+# Port registry files (contain cross-project infrastructure details)
+MASTER-PORTS.md
+ktv-singer-PORTS.md
