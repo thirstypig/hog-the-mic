@@ -19,12 +19,14 @@ final class PlayerViewModel: ObservableObject {
     @Published var currentTime: TimeInterval = 0
     @Published var duration: TimeInterval = 0
     @Published var error: Error?
+    @Published var isInstrumentalActive = false
 
     // MARK: - Services
 
     let playerService: YouTubePlayerService
     let lyricsService: LyricsSyncService
     private weak var queueService: QueueService?
+    private var instrumentalPlayer: AVPlayer?
 
     // MARK: - Private Properties
 
@@ -104,6 +106,19 @@ final class PlayerViewModel: ObservableObject {
                 self?.loadFromQueueEntry(entry)
             }
             .store(in: &cancellables)
+
+        // Handle audio source switching (instrumental toggle)
+        queueService?.$useInstrumental
+            .dropFirst()
+            .sink { [weak self] useInstrumental in
+                guard let self else { return }
+                if useInstrumental, let url = self.queueService?.instrumentalUrl {
+                    self.switchToInstrumental(url: url)
+                } else {
+                    self.switchToOriginal()
+                }
+            }
+            .store(in: &cancellables)
     }
 
     private func loadSong() {
@@ -119,6 +134,7 @@ final class PlayerViewModel: ObservableObject {
 
     /// Load a new song from a queue entry (fetches full Song from API)
     private func loadFromQueueEntry(_ entry: QueueEntry) {
+        switchToOriginal()
         playerService.stop()
 
         Task {
@@ -185,11 +201,35 @@ final class PlayerViewModel: ObservableObject {
     }
 
     func stop() {
+        switchToOriginal()
         playerService.stop()
     }
 
     func skipSong() {
         queueService?.skipSong()
+    }
+
+    // MARK: - Instrumental Audio
+
+    private func switchToInstrumental(url: String) {
+        guard let audioURL = URL(string: url) else { return }
+        // Mute video player, play instrumental track
+        playerService.player?.isMuted = true
+        let player = AVPlayer(url: audioURL)
+        // Sync instrumental to current playback position
+        let cmTime = CMTime(seconds: currentTime, preferredTimescale: 600)
+        player.seek(to: cmTime, toleranceBefore: .zero, toleranceAfter: .zero)
+        player.play()
+        instrumentalPlayer = player
+        isInstrumentalActive = true
+    }
+
+    private func switchToOriginal() {
+        // Unmute video, stop instrumental
+        playerService.player?.isMuted = false
+        instrumentalPlayer?.pause()
+        instrumentalPlayer = nil
+        isInstrumentalActive = false
     }
 
     /// Attach queue service after init (for QueuePlayerView where environmentObject isn't available at init)

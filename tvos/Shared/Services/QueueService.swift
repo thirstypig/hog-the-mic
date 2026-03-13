@@ -15,6 +15,8 @@ final class QueueService: ObservableObject {
 
     @Published var currentlyPlaying: QueueEntry?
     @Published var upcoming: [QueueEntry] = []
+    @Published var useInstrumental: Bool = false
+    @Published var instrumentalUrl: String?
 
     // MARK: - Private
 
@@ -40,6 +42,12 @@ final class QueueService: ObservableObject {
         socketService.on("play_song") { [weak self] data in
             Task { @MainActor in
                 self?.handlePlaySong(data: data)
+            }
+        }
+
+        socketService.on("switch_audio") { [weak self] data in
+            Task { @MainActor in
+                self?.handleSwitchAudio(data: data)
             }
         }
     }
@@ -104,6 +112,13 @@ final class QueueService: ObservableObject {
         guard let dict = data.first as? [String: Any],
               let entryDict = dict["entry"] as? [String: Any] else { return }
         currentlyPlaying = parseQueueEntry(entryDict)
+    }
+
+    private func handleSwitchAudio(data: [Any]) {
+        guard let dict = data.first as? [String: Any],
+              let useInstr = dict["useInstrumental"] as? Bool else { return }
+        useInstrumental = useInstr
+        instrumentalUrl = dict["instrumentalUrl"] as? String
     }
 
     private func parseQueueEntry(_ dict: [String: Any]) -> QueueEntry? {

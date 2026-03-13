@@ -2,48 +2,41 @@
 //  SongBrowserView.swift
 //  KTVSinger-tvOS
 //
-//  View for browsing and searching songs
+//  Home dashboard with queue status and song rails
 //
 
 import SwiftUI
 
 struct SongBrowserView: View {
     @StateObject private var viewModel = SongBrowserViewModel()
+    @EnvironmentObject var queueService: QueueService
     @State private var selectedSong: Song?
-    @State private var showingPlayer = false
-    @FocusState private var focusedField: FocusableField?
-
-    enum FocusableField {
-        case search
-        case genreFilter
-        case sortOptions
-    }
 
     var body: some View {
         NavigationStack {
             ZStack {
                 // Background
                 LinearGradient(
-                    colors: [.black, .blue.opacity(0.3)],
+                    colors: [.black, .blue.opacity(0.15)],
                     startPoint: .top,
                     endPoint: .bottom
                 )
                 .ignoresSafeArea()
 
                 VStack(spacing: 0) {
-                    // Header with search and filters
+                    // Header
                     header
                         .padding(.horizontal, 48)
                         .padding(.top, 40)
                         .padding(.bottom, 20)
 
-                    // Song grid
+                    // Content
                     if viewModel.isLoading {
                         loadingView
-                    } else if viewModel.filteredSongs.isEmpty {
+                    } else if viewModel.songs.isEmpty {
                         emptyView
                     } else {
-                        songGrid
+                        dashboardView
                     }
                 }
             }
@@ -56,114 +49,202 @@ struct SongBrowserView: View {
     // MARK: - Header
 
     private var header: some View {
-        VStack(spacing: 20) {
-            HStack {
-                Text("KTV Singer")
-                    .font(.system(size: 56, weight: .bold))
-                    .foregroundColor(.white)
+        HStack {
+            Text("KTV Singer")
+                .font(.system(size: 56, weight: .bold))
+                .foregroundColor(.white)
+            Spacer()
+        }
+    }
 
-                Spacer()
+    // MARK: - Dashboard View
+
+    private var dashboardView: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 40) {
+                // Now Playing hero
+                if let entry = queueService.currentlyPlaying {
+                    nowPlayingHero(entry: entry)
+                        .padding(.horizontal, 48)
+                }
+
+                // Up Next rail
+                if !queueService.upcoming.isEmpty {
+                    upNextRail
+                }
+
+                // Most Played rail
+                if !viewModel.mostPlayed.isEmpty {
+                    songRail(title: "Most Played", songs: viewModel.mostPlayed)
+                }
+
+                // Recently Added rail
+                if !viewModel.recentlyAdded.isEmpty {
+                    songRail(title: "Recently Added", songs: viewModel.recentlyAdded)
+                }
+            }
+            .padding(.bottom, 60)
+        }
+    }
+
+    // MARK: - Now Playing Hero
+
+    private func nowPlayingHero(entry: QueueEntry) -> some View {
+        ZStack(alignment: .bottomLeading) {
+            // Thumbnail
+            if let url = entry.thumbnailImageURL {
+                AsyncImage(url: url) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(16/9, contentMode: .fill)
+                } placeholder: {
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.2))
+                }
+            } else {
+                Rectangle()
+                    .fill(
+                        LinearGradient(
+                            colors: [.blue.opacity(0.5), .purple.opacity(0.5)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
             }
 
-            HStack(spacing: 20) {
-                // Search field
-                HStack {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundColor(.white.opacity(0.6))
-                        .font(.title2)
+            // Gradient overlay
+            LinearGradient(
+                colors: [.clear, .clear, .black.opacity(0.9)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
 
-                    TextField("Search songs or artists...", text: $viewModel.searchQuery)
-                        .textFieldStyle(.plain)
-                        .font(.title3)
-                        .foregroundColor(.white)
-                        .focused($focusedField, equals: .search)
-                }
-                .padding(20)
-                .background(Color.white.opacity(0.1))
-                .cornerRadius(12)
-                .frame(maxWidth: 800)
+            // Text overlay
+            VStack(alignment: .leading, spacing: 8) {
+                Text("NOW PLAYING")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(.green)
+                    .tracking(2)
 
-                // Genre filter
-                Menu {
-                    Button("All Genres") {
-                        viewModel.selectGenre(nil)
-                    }
-
-                    Divider()
-
-                    ForEach(viewModel.availableGenres, id: \.self) { genre in
-                        Button(genre) {
-                            viewModel.selectGenre(genre)
-                        }
-                    }
-                } label: {
-                    HStack {
-                        Image(systemName: "line.3.horizontal.decrease.circle")
-                        Text(viewModel.selectedGenre ?? "Genre")
-                    }
-                    .font(.title3)
+                Text(entry.title)
+                    .font(.system(size: 42, weight: .bold))
                     .foregroundColor(.white)
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 16)
-                    .background(Color.white.opacity(0.1))
-                    .cornerRadius(12)
-                }
-                .focused($focusedField, equals: .genreFilter)
+                    .lineLimit(2)
 
-                // Sort options
-                Menu {
-                    ForEach(SongBrowserViewModel.SortOption.allCases, id: \.self) { option in
-                        Button {
-                            viewModel.changeSortOption(option)
-                        } label: {
-                            HStack {
-                                Image(systemName: option.systemImage)
-                                Text(option.rawValue)
-                                if viewModel.sortOption == option {
-                                    Spacer()
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        }
+                Text(entry.artist)
+                    .font(.title2)
+                    .foregroundColor(.white.opacity(0.8))
+            }
+            .padding(40)
+        }
+        .frame(height: 400)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+
+    // MARK: - Up Next Rail
+
+    private var upNextRail: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Up Next")
+                .font(.title2)
+                .fontWeight(.bold)
+                .foregroundColor(.white)
+                .padding(.horizontal, 48)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 24) {
+                    ForEach(queueService.upcoming) { entry in
+                        queueEntryCard(entry: entry)
+                            .frame(width: 320)
                     }
-                } label: {
-                    HStack {
-                        Image(systemName: "arrow.up.arrow.down")
-                        Text("Sort")
-                    }
-                    .font(.title3)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 16)
-                    .background(Color.white.opacity(0.1))
-                    .cornerRadius(12)
                 }
-                .focused($focusedField, equals: .sortOptions)
+                .padding(.horizontal, 48)
             }
         }
     }
 
-    // MARK: - Song Grid
+    // MARK: - Queue Entry Card
 
-    private var songGrid: some View {
-        ScrollView {
-            LazyVGrid(
-                columns: [
-                    GridItem(.adaptive(minimum: 400, maximum: 500), spacing: 30)
-                ],
-                spacing: 30
-            ) {
-                ForEach(viewModel.filteredSongs) { song in
-                    Button {
-                        selectedSong = song
-                    } label: {
-                        SongCard(song: song)
-                    }
-                    .buttonStyle(.card)
+    private func queueEntryCard(entry: QueueEntry) -> some View {
+        ZStack(alignment: .bottomLeading) {
+            if let url = entry.thumbnailImageURL {
+                AsyncImage(url: url) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(16/9, contentMode: .fill)
+                } placeholder: {
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.3))
+                        .overlay(
+                            Image(systemName: "music.note")
+                                .font(.system(size: 40))
+                                .foregroundColor(.white.opacity(0.5))
+                        )
                 }
+            } else {
+                Rectangle()
+                    .fill(
+                        LinearGradient(
+                            colors: [.blue.opacity(0.6), .purple.opacity(0.6)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .overlay(
+                        Image(systemName: "music.note")
+                            .font(.system(size: 40))
+                            .foregroundColor(.white.opacity(0.7))
+                    )
             }
-            .padding(.horizontal, 48)
-            .padding(.bottom, 60)
+
+            LinearGradient(
+                colors: [.clear, .black.opacity(0.85)],
+                startPoint: .center,
+                endPoint: .bottom
+            )
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(entry.title)
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                    .lineLimit(2)
+
+                Text(entry.artist)
+                    .font(.subheadline)
+                    .foregroundColor(.white.opacity(0.8))
+                    .lineLimit(1)
+            }
+            .padding(16)
+        }
+        .aspectRatio(16/9, contentMode: .fit)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    // MARK: - Song Rail
+
+    private func songRail(title: String, songs: [Song]) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text(title)
+                .font(.title2)
+                .fontWeight(.bold)
+                .foregroundColor(.white)
+                .padding(.horizontal, 48)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 24) {
+                    ForEach(songs) { song in
+                        Button {
+                            selectedSong = song
+                        } label: {
+                            SongCard(song: song)
+                                .frame(width: 320)
+                        }
+                        .buttonStyle(.card)
+                    }
+                }
+                .padding(.horizontal, 48)
+            }
         }
     }
 
@@ -192,12 +273,6 @@ struct SongBrowserView: View {
                 .font(.title)
                 .foregroundColor(.white)
 
-            if !viewModel.searchQuery.isEmpty {
-                Text("Try a different search term")
-                    .font(.title3)
-                    .foregroundColor(.white.opacity(0.6))
-            }
-
             Button("Refresh") {
                 Task {
                     await viewModel.refresh()
@@ -210,14 +285,14 @@ struct SongBrowserView: View {
     }
 }
 
-// MARK: - Song Card
+// MARK: - Song Card (overlay design)
 
 struct SongCard: View {
     let song: Song
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Thumbnail
+        ZStack(alignment: .bottomLeading) {
+            // Thumbnail fills card
             if let thumbnailURL = song.thumbnailImageURL {
                 AsyncImage(url: thumbnailURL) { image in
                     image
@@ -228,12 +303,10 @@ struct SongCard: View {
                         .fill(Color.gray.opacity(0.3))
                         .overlay(
                             Image(systemName: "music.note")
-                                .font(.system(size: 50))
+                                .font(.system(size: 40))
                                 .foregroundColor(.white.opacity(0.5))
                         )
                 }
-                .frame(height: 220)
-                .clipShape(RoundedRectangle(cornerRadius: 16))
             } else {
                 Rectangle()
                     .fill(
@@ -243,50 +316,49 @@ struct SongCard: View {
                             endPoint: .bottomTrailing
                         )
                     )
-                    .frame(height: 220)
                     .overlay(
                         Image(systemName: "music.note")
-                            .font(.system(size: 50))
+                            .font(.system(size: 40))
                             .foregroundColor(.white.opacity(0.7))
                     )
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
             }
 
-            // Song info
-            VStack(alignment: .leading, spacing: 6) {
+            // Gradient overlay at bottom for text
+            LinearGradient(
+                colors: [.clear, .black.opacity(0.85)],
+                startPoint: .center,
+                endPoint: .bottom
+            )
+
+            // Song info overlaid at bottom
+            VStack(alignment: .leading, spacing: 4) {
                 Text(song.title)
-                    .font(.title3)
+                    .font(.headline)
                     .fontWeight(.semibold)
                     .foregroundColor(.white)
                     .lineLimit(2)
 
-                Text(song.artist)
-                    .font(.body)
-                    .foregroundColor(.white.opacity(0.7))
-                    .lineLimit(1)
-
                 HStack {
-                    Text(song.genre)
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.6))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.white.opacity(0.1))
-                        .cornerRadius(6)
+                    Text(song.artist)
+                        .font(.subheadline)
+                        .foregroundColor(.white.opacity(0.8))
+                        .lineLimit(1)
 
                     Spacer()
 
-                    Text(String(song.year))
+                    Text(song.genre)
                         .font(.caption)
                         .foregroundColor(.white.opacity(0.6))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.white.opacity(0.15))
+                        .cornerRadius(4)
                 }
             }
-            .padding(.horizontal, 8)
+            .padding(16)
         }
-        .padding(16)
-        .background(Color.white.opacity(0.05))
-        .cornerRadius(20)
-        .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: 5)
+        .aspectRatio(16/9, contentMode: .fit)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
 
@@ -294,4 +366,5 @@ struct SongCard: View {
 
 #Preview {
     SongBrowserView()
+        .environmentObject(QueueService())
 }

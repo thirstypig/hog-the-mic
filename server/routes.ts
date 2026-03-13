@@ -10,6 +10,7 @@ import { registerPlaylistRoutes } from "./features/playlist";
 import { registerVocalSeparationRoutes } from "./features/vocal-separation";
 import { registerStreamingRoutes } from "./features/streaming";
 import { registerPairingRoutes, setupPairingSocket, createSessionStore } from "./features/pairing";
+import { registerTechRoutes } from "./features/tech";
 
 export async function registerRoutes(app: Express): Promise<{ httpServer: Server; io: SocketIOServer }> {
   // Health check (no auth)
@@ -33,6 +34,7 @@ export async function registerRoutes(app: Express): Promise<{ httpServer: Server
   registerVocalSeparationRoutes(app);
   registerStreamingRoutes(app);
   registerPairingRoutes(app, sessionStore);
+  registerTechRoutes(app);
 
   const httpServer = createServer(app);
 

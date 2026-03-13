@@ -1,2 +1,3 @@
 export { useVocalSeparation } from "./hooks/useVocalSeparation";
-export type { GaudioStatus } from "./types/vocal-separation.types";
+export { InstrumentalToggle } from "./components/InstrumentalToggle";
+export type { SeparationStatus, SeparationState } from "./types/vocal-separation.types";

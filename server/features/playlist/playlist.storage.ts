@@ -1,9 +1,11 @@
 import {
   playlists,
   playlistSongs,
+  songs,
   type Playlist,
   type InsertPlaylist,
   type PlaylistSong,
+  type Song,
 } from "@shared/schema";
 import { db } from "../../db";
 import { eq, and } from "drizzle-orm";
@@ -55,6 +57,16 @@ export async function getPlaylistSongs(playlistId: string): Promise<PlaylistSong
     .from(playlistSongs)
     .where(eq(playlistSongs.playlistId, playlistId))
     .orderBy(playlistSongs.position);
+}
+
+export async function getPlaylistSongsWithDetails(playlistId: string): Promise<Song[]> {
+  const rows = await db
+    .select({ song: songs })
+    .from(playlistSongs)
+    .innerJoin(songs, eq(playlistSongs.songId, songs.id))
+    .where(eq(playlistSongs.playlistId, playlistId))
+    .orderBy(playlistSongs.position);
+  return rows.map((r) => r.song);
 }
 
 export async function reorderPlaylistSongs(

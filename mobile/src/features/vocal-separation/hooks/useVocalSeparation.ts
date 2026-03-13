@@ -1,43 +1,62 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { queryClient } from "@common/lib/queryClient";
 import { useToast } from "@common/hooks/use-toast";
 import { apiUrl } from "@common/lib/api";
-import type { GaudioStatus } from "../types/vocal-separation.types";
+import type { SeparationStatus } from "../types/vocal-separation.types";
 
 export function useVocalSeparation() {
-  const [gaudioStatus, setGaudioStatus] = useState<GaudioStatus>("idle");
+  const [statuses, setStatuses] = useState<Record<string, SeparationStatus>>({});
+  const [instrumentalUrls, setInstrumentalUrls] = useState<Record<string, string>>({});
+  const pollingRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const { toast } = useToast();
 
-  const checkGaudioStatus = useCallback(
+  const getStatus = useCallback(
+    (songId: string): SeparationStatus => statuses[songId] ?? "idle",
+    [statuses],
+  );
+
+  const getInstrumentalUrl = useCallback(
+    (songId: string): string | null => instrumentalUrls[songId] ?? null,
+    [instrumentalUrls],
+  );
+
+  const checkStatus = useCallback(
     async (songId: string) => {
       try {
         const response = await fetch(
-          apiUrl(`/api/songs/${songId}/gaudio-status`),
+          apiUrl(`/api/songs/${songId}/separation-status`),
         );
         const data = await response.json();
 
-        if (data.status === "completed") {
-          setGaudioStatus("completed");
+        if (data.status === "completed" && data.instrumentalUrl) {
+          setStatuses((prev) => ({ ...prev, [songId]: "completed" }));
+          setInstrumentalUrls((prev) => ({
+            ...prev,
+            [songId]: data.instrumentalUrl,
+          }));
           queryClient.invalidateQueries({ queryKey: ["/api/songs"] });
           toast({
-            title: "Karaoke Track Ready!",
-            description: "Your instrumental track is ready to play!",
+            title: "Instrumental Ready",
+            description: "Vocal separation complete!",
           });
         } else if (data.status === "processing") {
-          setTimeout(() => checkGaudioStatus(songId), 10000);
+          pollingRef.current[songId] = setTimeout(
+            () => checkStatus(songId),
+            10000,
+          );
         }
       } catch (error) {
-        console.error("Failed to check Gaudio status:", error);
+        console.error("Failed to check separation status:", error);
       }
     },
     [toast],
   );
 
-  const gaudioSeparateMutation = useMutation({
+  const separateMutation = useMutation({
     mutationFn: async (songId: string) => {
       const response = await fetch(
-        apiUrl(`/api/songs/${songId}/gaudio-separate`),
+        apiUrl(`/api/songs/${songId}/separate-vocals`),
         { method: "POST" },
       );
       const data = await response.json();
@@ -48,29 +67,46 @@ export function useVocalSeparation() {
     },
     onSuccess: (data, songId) => {
       if (data.status === "processing") {
-        setGaudioStatus("processing");
+        setStatuses((prev) => ({ ...prev, [songId]: "processing" }));
         toast({
-          title: "Processing Started!",
-          description: "Creating karaoke track with AI vocal removal...",
+          title: "Processing Started",
+          description: "Separating vocals with AI...",
         });
-        checkGaudioStatus(songId);
+        checkStatus(songId);
       } else if (data.status === "completed") {
-        setGaudioStatus("completed");
+        setStatuses((prev) => ({ ...prev, [songId]: "completed" }));
+        if (data.instrumentalUrl) {
+          setInstrumentalUrls((prev) => ({
+            ...prev,
+            [songId]: data.instrumentalUrl,
+          }));
+        }
         toast({
-          title: "Karaoke Track Ready!",
-          description: "Instrumental track is ready to play.",
+          title: "Instrumental Ready",
+          description: "Vocal separation already complete!",
         });
       }
     },
     onError: (error: Error) => {
-      setGaudioStatus("idle");
       toast({
-        title: "Feature Not Available",
+        title: "Separation Failed",
         description: error.message,
         variant: "destructive",
       });
     },
   });
 
-  return { gaudioStatus, setGaudioStatus, gaudioSeparateMutation, checkGaudioStatus };
+  const separateVocals = useCallback(
+    (songId: string) => {
+      separateMutation.mutate(songId);
+    },
+    [separateMutation],
+  );
+
+  return {
+    getStatus,
+    getInstrumentalUrl,
+    separateVocals,
+    isProcessing: separateMutation.isPending,
+  };
 }

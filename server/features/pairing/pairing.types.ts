@@ -57,6 +57,12 @@ export interface ReorderQueuePayload {
   newIndex: number;
 }
 
+export interface SwitchAudioPayload {
+  songId: string;
+  useInstrumental: boolean;
+  instrumentalUrl: string | null;
+}
+
 // ── Socket.io event payloads ────────────────────────────────────
 
 /** Client → Server */
@@ -104,6 +110,7 @@ export interface ClientToServerEvents {
   add_to_queue: (payload: AddToQueuePayload) => void;
   remove_from_queue: (payload: RemoveFromQueuePayload) => void;
   reorder_queue: (payload: ReorderQueuePayload) => void;
+  switch_audio: (payload: SwitchAudioPayload) => void;
   skip_song: () => void;
   song_finished: () => void;
   audio_chunk: (data: Buffer) => void;
@@ -120,6 +127,7 @@ export interface ServerToClientEvents {
   session_state: (payload: SessionStatePayload) => void;
   queue_updated: (payload: QueueStatePayload) => void;
   play_song: (payload: PlaySongPayload) => void;
+  switch_audio: (payload: SwitchAudioPayload) => void;
   audio_chunk: (data: Buffer) => void;
   audio_start: (payload: { socketId: string }) => void;
   audio_stop: (payload: { socketId: string }) => void;

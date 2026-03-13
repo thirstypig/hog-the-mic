@@ -10,7 +10,7 @@ import type { PairedPayload } from "@features/pairing";
 
 type Nav = NativeStackNavigationProp<RootStackParamList, "Pair">;
 
-const DEFAULT_SERVER_URL = "http://192.168.6.12:4040";
+const DEFAULT_SERVER_URL = "http://localhost:4040";
 
 type Mode = "choose" | "scan" | "host";
 

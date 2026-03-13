@@ -1,8 +1,11 @@
+import { useState } from "react";
 import { View, Text, Pressable, FlatList } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
-import { ChevronUp, ChevronDown, X, SkipForward, Search } from "lucide-react-native";
-import { usePairingContext } from "@features/pairing";
+import { ChevronUp, ChevronDown, X, SkipForward, Search, ListMusic } from "lucide-react-native";
+import { usePairingContext, getSocket } from "@features/pairing";
+import { PlaylistPicker } from "@features/playlist";
+import { useVocalSeparation, InstrumentalToggle } from "@features/vocal-separation";
 import { colors } from "@theme/colors";
 import type { QueueEntry } from "@features/pairing";
 import type { SessionTabParamList } from "@navigation/types";
@@ -11,16 +14,25 @@ type Nav = BottomTabNavigationProp<SessionTabParamList, "Queue">;
 
 export default function QueueScreen() {
   const navigation = useNavigation<Nav>();
+  const [showPlaylistPicker, setShowPlaylistPicker] = useState(false);
+  const { getStatus, getInstrumentalUrl, separateVocals } = useVocalSeparation();
   const {
     currentlyPlaying,
     upcoming,
     isQueueFull,
+    addToQueue,
     skipSong,
     removeFromQueue,
     reorderQueue,
   } = usePairingContext();
 
   const totalSongs = upcoming.length + (currentlyPlaying ? 1 : 0);
+
+  const handleSwitchAudio = (songId: string, useInstrumental: boolean, instrumentalUrl: string | null) => {
+    const socket = getSocket();
+    if (!socket) return;
+    socket.emit("switch_audio", { songId, useInstrumental, instrumentalUrl });
+  };
 
   const handleMoveUp = (entry: QueueEntry, index: number) => {
     if (index === 0) return;
@@ -87,10 +99,21 @@ export default function QueueScreen() {
       {/* Header */}
       <View className="flex-row items-center justify-between px-4 pt-4 pb-2">
         <Text className="text-foreground text-xl font-bold">Queue</Text>
-        <View className="px-3 py-1 rounded-full bg-muted">
-          <Text className="text-muted-foreground text-sm font-semibold">
-            {totalSongs}/10 songs
-          </Text>
+        <View className="flex-row items-center gap-2">
+          <Pressable
+            className="flex-row items-center px-3 py-1 rounded-full bg-muted"
+            onPress={() => setShowPlaylistPicker(true)}
+          >
+            <ListMusic size={14} color={colors.mutedForeground} />
+            <Text className="text-muted-foreground text-sm font-semibold ml-1">
+              Playlists
+            </Text>
+          </Pressable>
+          <View className="px-3 py-1 rounded-full bg-muted">
+            <Text className="text-muted-foreground text-sm font-semibold">
+              {totalSongs}/10 songs
+            </Text>
+          </View>
         </View>
       </View>
 
@@ -115,6 +138,15 @@ export default function QueueScreen() {
           <Text className="text-muted-foreground text-sm" numberOfLines={1}>
             {currentlyPlaying.artist} — added by {currentlyPlaying.addedBy}
           </Text>
+          <View className="mt-2">
+            <InstrumentalToggle
+              songId={currentlyPlaying.songId}
+              status={getStatus(currentlyPlaying.songId)}
+              instrumentalUrl={getInstrumentalUrl(currentlyPlaying.songId)}
+              onSeparate={separateVocals}
+              onToggle={handleSwitchAudio}
+            />
+          </View>
         </View>
       )}
 
@@ -162,6 +194,14 @@ export default function QueueScreen() {
           </Text>
         </View>
       )}
+
+      <PlaylistPicker
+        visible={showPlaylistPicker}
+        onClose={() => setShowPlaylistPicker(false)}
+        addToQueue={addToQueue}
+        isQueueFull={isQueueFull}
+        currentQueueSize={totalSongs}
+      />
     </View>
   );
 }
