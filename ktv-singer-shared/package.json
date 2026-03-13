@@ -1,0 +1,20 @@
+{
+  "name": "ktv-singer-shared",
+  "version": "1.0.0",
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    "./schema": "./schema/index.ts",
+    "./schema/*": "./schema/*.ts",
+    "./pairing": "./pairing/index.ts"
+  },
+  "peerDependencies": {
+    "drizzle-orm": "^0.39.1",
+    "drizzle-zod": "^0.7.0",
+    "postgres": "^3.4.5",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "typescript": "5.6.3"
+  }
+}

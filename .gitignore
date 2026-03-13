@@ -4,20 +4,22 @@ node_modules
 dist
 build
 .claude/
-mobile/.expo/
-mobile/ios/
-mobile/android/
+
+# Mobile
+ktv-singer-app/.expo/
+ktv-singer-app/ios/
+ktv-singer-app/android/
 
 # Temp build artifacts
 *.player-script.js
 
 # tvOS
-tvos/.build/
-tvos/KTVSinger.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
-tvos/KTVSinger.xcodeproj/project.xcworkspace/xcuserdata/
-tvos/KTVSinger.xcodeproj/xcuserdata/
-tvos/Package.resolved
+ktv-singer-tvos/.build/
+ktv-singer-tvos/KTVSinger.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
+ktv-singer-tvos/KTVSinger.xcodeproj/project.xcworkspace/xcuserdata/
+ktv-singer-tvos/KTVSinger.xcodeproj/xcuserdata/
+ktv-singer-tvos/Package.resolved
 
-# Port registry files (contain cross-project infrastructure details)
+# Port registry files
 MASTER-PORTS.md
 ktv-singer-PORTS.md
