@@ -144,8 +144,7 @@ Mobile features: auth, library, player, playlist, scoring, search, vocal-separat
 - **Do not modify shared/schema without running db:push.** Schema changes require a database migration step.
 - **tvOS Xcode project is generated from project.yml.** Run `xcodegen generate` in `tvos/` after changing `project.yml`. Do not hand-edit `project.pbxproj`.
 - **tvOS uses `AppSupabaseClient` (not `SupabaseClient`)** to avoid naming conflict with the Supabase SDK's own `SupabaseClient` class.
-- **tvOS APIClient base URL** is hardcoded to a local IP. When changing networks, update `tvos/Shared/Networking/APIClient.swift` default URL or change it in-app via Settings.
-- **Use `npx tsc --noEmit` instead of `npm run check:server`** for server type checking (`tsconfig.server.json` doesn't exist).
+- **tvOS APIClient base URL** defaults to `localhost:4040` (works on simulator). Physical devices get the server URL from QR code pairing or manual entry in Settings.
 - **Port assignments**: See `PORTS.md` for this project's port assignments. Express API runs on port **4040** (default), Socket.IO shares the same port. No separate frontend server.
 
 ## tvOS Architecture Notes
@@ -201,7 +200,6 @@ Mobile features: auth, library, player, playlist, scoring, search, vocal-separat
 
 ## Known Issues
 
-- `npm run check:server` references nonexistent `tsconfig.server.json` — use `npx tsc --noEmit` instead
 - Free Apple Developer account: apps on real device expire after 7 days, need re-deploy
 - tvOS `.onTapGesture` doesn't work with Siri Remote — always use `Button` for selectable elements
 - `yt-dlp` must be installed on the server host — streaming will fail without it

@@ -50,7 +50,7 @@ struct ContentView: View {
             TabView {
                 SongBrowserView()
                     .tabItem {
-                        Label("Browse", systemImage: "music.note.list")
+                        Label("Home", systemImage: "house.fill")
                     }
 
                 FavoritesView()
@@ -66,6 +66,7 @@ struct ContentView: View {
 
             // Floating button to show pairing QR code
             VStack {
+                Spacer()
                 HStack {
                     Spacer()
                     Button {
@@ -90,10 +91,9 @@ struct ContentView: View {
                         .clipShape(Circle())
                         .shadow(radius: 10)
                     }
-                    .padding(.top, 60)
+                    .padding(.bottom, 60)
                     .padding(.trailing, 60)
                 }
-                Spacer()
             }
             .sheet(isPresented: $showPairingSheet) {
                 PairingView()

@@ -7,6 +7,7 @@ import type {
   ServerToClientEvents,
   SessionMember,
   QueueEntry,
+  SwitchAudioPayload,
 } from "./pairing.types";
 
 // ── Validation helpers ──────────────────────────────────────────
@@ -37,6 +38,7 @@ const RATE_LIMITS: Record<string, RateLimitConfig> = {
   add_to_queue: { windowMs: 5000, maxEvents: 5 },
   remove_from_queue: { windowMs: 5000, maxEvents: 10 },
   reorder_queue: { windowMs: 2000, maxEvents: 5 },
+  switch_audio: { windowMs: 2000, maxEvents: 3 },
   skip_song: { windowMs: 3000, maxEvents: 2 },
   song_finished: { windowMs: 3000, maxEvents: 2 },
   // Low-frequency: scoring
@@ -110,6 +112,9 @@ export function setupPairingSocket(httpServer: Server, sessionStore: SessionStor
     { sessionId: string; role: "tv" | "singer"; deviceName: string }
   >();
 
+  /** Audio chunk counter per socket for debug logging */
+  const audioChunkCounters = new Map<string, number>();
+
   pairing.on("connection", (socket) => {
     console.log(`[pairing] connected: ${socket.id}`);
 
@@ -152,6 +157,18 @@ export function setupPairingSocket(httpServer: Server, sessionStore: SessionStor
             if (m.role === "tv") {
               delete session.members[socketId];
               socketSessionMap.delete(socketId);
+              break;
+            }
+          }
+        }
+
+        // Dedup singers by deviceName — evict previous socket for same device
+        if (role === "singer") {
+          for (const [existingSocketId, m] of Object.entries(session.members)) {
+            if (m.role === "singer" && m.deviceName === deviceName && existingSocketId !== socket.id) {
+              delete session.members[existingSocketId];
+              socketSessionMap.delete(existingSocketId);
+              console.log(`[pairing] evicted stale socket ${existingSocketId} for device "${deviceName}"`);
               break;
             }
           }
@@ -350,6 +367,20 @@ export function setupPairingSocket(httpServer: Server, sessionStore: SessionStor
       }
     });
 
+    // ── Audio source switch (vocal separation) ────────────────
+    socket.on("switch_audio", (payload: SwitchAudioPayload) => {
+      if (!checkRate(socket.id, "switch_audio")) return;
+      const info = socketSessionMap.get(socket.id);
+      if (!info) return;
+
+      if (!validateString(payload.songId, 100)) return;
+      if (typeof payload.useInstrumental !== "boolean") return;
+      if (payload.instrumentalUrl !== null && !validateString(payload.instrumentalUrl, 2000)) return;
+
+      // Relay to all other devices in the session (especially TV)
+      socket.to(`session:${info.sessionId}`).emit("switch_audio", payload);
+    });
+
     // ── Audio relay (Phase 2 prep — passthrough) ──────────────
     socket.on("audio_chunk", (data) => {
       if (!checkRate(socket.id, "audio_chunk")) return;
@@ -360,6 +391,13 @@ export function setupPairingSocket(httpServer: Server, sessionStore: SessionStor
       const chunkSize = Buffer.isBuffer(data) ? data.length : typeof data === "string" ? (data as string).length : 0;
       if (chunkSize > 65_536) return;
 
+      // Debug logging every 20th chunk
+      const count = (audioChunkCounters.get(socket.id) ?? 0) + 1;
+      audioChunkCounters.set(socket.id, count);
+      if (count % 20 === 0) {
+        console.log(`[pairing] audio_chunk #${count} from ${socket.id} (${info.deviceName}), size=${chunkSize}`);
+      }
+
       socket.to(`session:${info.sessionId}`).emit("audio_chunk", data);
     });
 
@@ -367,6 +405,8 @@ export function setupPairingSocket(httpServer: Server, sessionStore: SessionStor
       if (!checkRate(socket.id, "audio_start")) return;
       const info = socketSessionMap.get(socket.id);
       if (!info) return;
+      console.log(`[pairing] audio_start from ${socket.id} (${info.deviceName})`);
+      audioChunkCounters.set(socket.id, 0);
       socket
         .to(`session:${info.sessionId}`)
         .emit("audio_start", { socketId: socket.id });
@@ -376,6 +416,9 @@ export function setupPairingSocket(httpServer: Server, sessionStore: SessionStor
       if (!checkRate(socket.id, "audio_stop")) return;
       const info = socketSessionMap.get(socket.id);
       if (!info) return;
+      const totalChunks = audioChunkCounters.get(socket.id) ?? 0;
+      console.log(`[pairing] audio_stop from ${socket.id} (${info.deviceName}), total chunks=${totalChunks}`);
+      audioChunkCounters.delete(socket.id);
       socket
         .to(`session:${info.sessionId}`)
         .emit("audio_stop", { socketId: socket.id });
@@ -429,6 +472,7 @@ export function setupPairingSocket(httpServer: Server, sessionStore: SessionStor
         }
 
         socketSessionMap.delete(socket.id);
+        audioChunkCounters.delete(socket.id);
         rateLimiter.remove(socket.id);
       } catch (err) {
         console.error("[pairing] disconnect error:", err);

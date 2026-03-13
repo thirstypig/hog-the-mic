@@ -3,7 +3,6 @@
 //  KTVSinger-tvOS
 //
 //  Main player view with video and synchronized lyrics
-//  Ported from React Native PlayerScreen.tsx
 //
 
 import SwiftUI
@@ -14,6 +13,9 @@ struct PlayerView: View {
     @StateObject private var viewModel: PlayerViewModel
     @Environment(\.dismiss) private var dismiss
     @FocusState private var focusedControl: FocusableControl?
+
+    @State private var showControls = true
+    @State private var controlsTimer: Timer?
 
     init(song: Song) {
         _viewModel = StateObject(wrappedValue: PlayerViewModel(song: song))
@@ -33,56 +35,162 @@ struct PlayerView: View {
             let h = geo.size.height
 
             ZStack {
+                // Layer 1: Full-bleed video
                 Color.black.ignoresSafeArea()
+                videoPlayer
+                    .ignoresSafeArea()
 
-                VStack(spacing: 0) {
-                    // Top bar with controls
-                    topBar
+                // Layer 2: Right-side gradient scrim
+                HStack(spacing: 0) {
+                    Spacer()
+                    LinearGradient(
+                        colors: [.clear, .black.opacity(0.85)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                    .frame(width: w * 0.45)
+                }
+                .ignoresSafeArea()
+
+                // Layer 3: Lyrics panel overlaid on right
+                HStack(spacing: 0) {
+                    Spacer()
+                    lyricsPanel(screenWidth: w, screenHeight: h)
+                        .frame(width: w * 0.35)
+                }
+                .ignoresSafeArea()
+
+                // Layer 4: Auto-hiding controls overlay
+                VStack {
+                    topBar(screenWidth: w)
                         .padding(.horizontal, w * 0.025)
-                        .padding(.vertical, h * 0.022)
+                        .padding(.top, h * 0.03)
+                        .background(
+                            LinearGradient(
+                                colors: [.black.opacity(0.7), .clear],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                            .ignoresSafeArea()
+                        )
 
-                    // Main content: Video + Lyrics side-by-side
-                    HStack(spacing: 0) {
-                        // Video player
-                        videoPlayer
-                            .frame(maxWidth: .infinity)
-                            .aspectRatio(16/9, contentMode: .fit)
+                    Spacer()
 
-                        // Lyrics panel
-                        lyricsPanel(screenWidth: w, screenHeight: h)
-                            .frame(width: w * 0.35)
+                    // Time labels
+                    HStack {
+                        Spacer()
+                        if showControls {
+                            HStack(spacing: 8) {
+                                Text(viewModel.formattedCurrentTime)
+                                    .font(.system(size: 16, weight: .medium, design: .monospaced))
+                                Text("/")
+                                Text(viewModel.formattedDuration)
+                                    .font(.system(size: 16, weight: .medium, design: .monospaced))
+                            }
+                            .foregroundColor(.white.opacity(0.7))
+                            .padding(.trailing, w * 0.03)
+                            .padding(.bottom, h * 0.08)
+                            .transition(.opacity)
+                        }
                     }
+                }
+                .opacity(showControls ? 1 : 0)
+                .animation(.easeInOut(duration: 0.4), value: showControls)
+
+                // Layer 5: Thin progress bar at bottom (always visible)
+                VStack {
+                    Spacer()
+                    progressBar(screenWidth: w)
+                }
+                .ignoresSafeArea()
+
+                // Mic level indicator — always visible when receiving
+                VStack {
+                    HStack {
+                        Spacer()
+                        if audioStreamService.isReceiving {
+                            MicLevelIndicator(
+                                level: audioStreamService.audioLevel,
+                                isReceiving: true,
+                                chunksReceived: audioStreamService.chunksReceived,
+                                engineState: audioStreamService.engineState
+                            )
+                            .padding(.top, h * 0.03)
+                            .padding(.trailing, w * 0.37)
+                        }
+                    }
+                    Spacer()
                 }
             }
         }
         .persistentSystemOverlays(.hidden)
+        .onChange(of: focusedControl) { _, _ in
+            showControlsTemporarily()
+        }
+        .onAppear {
+            showControlsTemporarily()
+        }
+    }
+
+    // MARK: - Controls Timer
+
+    private func showControlsTemporarily() {
+        showControls = true
+        controlsTimer?.invalidate()
+        controlsTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { _ in
+            Task { @MainActor in
+                withAnimation {
+                    showControls = false
+                }
+            }
+        }
+    }
+
+    // MARK: - Progress Bar
+
+    private func progressBar(screenWidth: CGFloat) -> some View {
+        ZStack(alignment: .leading) {
+            Rectangle()
+                .fill(Color.white.opacity(0.15))
+                .frame(height: 3)
+
+            Rectangle()
+                .fill(
+                    LinearGradient(
+                        colors: [.cyan, .blue],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .frame(width: screenWidth * viewModel.progress, height: 3)
+                .animation(.linear(duration: 0.5), value: viewModel.progress)
+        }
+        .frame(height: 3)
     }
 
     // MARK: - Top Bar
 
-    private var topBar: some View {
+    private func topBar(screenWidth: CGFloat) -> some View {
         HStack(spacing: 20) {
-            // Back button
             Button {
                 viewModel.stop()
                 dismiss()
             } label: {
-                HStack {
+                HStack(spacing: 6) {
                     Image(systemName: "chevron.left")
-                        .font(.title2)
+                        .font(.title3)
                     Text("Back")
                         .font(.headline)
                 }
                 .foregroundColor(.white)
                 .padding(.horizontal, 20)
                 .padding(.vertical, 12)
-                .background(Color.white.opacity(0.2))
-                .cornerRadius(10)
+                .background(.ultraThinMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
             }
             .focused($focusedControl, equals: .back)
 
-            // Song info
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(viewModel.song.title)
                     .font(.title2)
                     .fontWeight(.bold)
@@ -94,17 +202,8 @@ struct PlayerView: View {
                     .foregroundColor(.white.opacity(0.8))
                     .lineLimit(1)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
 
             Spacer()
-
-            // Mic level indicator
-            if audioStreamService.isReceiving {
-                MicLevelIndicator(
-                    level: audioStreamService.audioLevel,
-                    isReceiving: true
-                )
-            }
 
             // Lyrics offset controls
             HStack(spacing: 16) {
@@ -116,8 +215,8 @@ struct PlayerView: View {
                         .foregroundColor(.white)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 8)
-                        .background(Color.white.opacity(0.2))
-                        .cornerRadius(8)
+                        .background(.ultraThinMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
                 .focused($focusedControl, equals: .decreaseOffset)
 
@@ -134,8 +233,8 @@ struct PlayerView: View {
                         .foregroundColor(.white)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 8)
-                        .background(Color.white.opacity(0.2))
-                        .cornerRadius(8)
+                        .background(.ultraThinMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
                 .focused($focusedControl, equals: .increaseOffset)
             }
@@ -158,6 +257,7 @@ struct PlayerView: View {
             if let player = viewModel.playerService.player {
                 VideoPlayer(player: player)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .ignoresSafeArea()
             } else if viewModel.playerService.isLoading {
                 VStack(spacing: 20) {
                     ProgressView()
@@ -212,7 +312,6 @@ struct PlayerView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .background(Color.black)
     }
 
     // MARK: - Lyrics Panel
@@ -221,22 +320,25 @@ struct PlayerView: View {
         let hPad = max(20, screenWidth * 0.02)
         let topPad = max(100, screenHeight * 0.28)
         let bottomPad = max(150, screenHeight * 0.37)
-        let activeFontSize = max(28, screenWidth * 0.022)
+        let activeFontSize = max(30, screenWidth * 0.024)
+        let nextFontSize = max(24, screenWidth * 0.019)
         let inactiveFontSize = max(22, screenWidth * 0.017)
 
         return ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    // Top padding for centering
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 14) {
                     Color.clear.frame(height: topPad)
 
                     if viewModel.song.lyrics.isEmpty {
                         noLyricsView
                     } else {
-                        lyricsContent(activeFontSize: activeFontSize, inactiveFontSize: inactiveFontSize)
+                        lyricsContent(
+                            activeFontSize: activeFontSize,
+                            nextFontSize: nextFontSize,
+                            inactiveFontSize: inactiveFontSize
+                        )
                     }
 
-                    // Bottom padding
                     Color.clear.frame(height: bottomPad)
                 }
                 .padding(.horizontal, hPad)
@@ -244,27 +346,32 @@ struct PlayerView: View {
             }
             .onChange(of: viewModel.lyricsService.activeLineIndex) { _, newIndex in
                 if let index = newIndex {
-                    withAnimation(.easeInOut(duration: 0.3)) {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                         proxy.scrollTo(index, anchor: .center)
                     }
                 }
             }
         }
-        .background(Color.black.opacity(0.3))
     }
 
-    private func lyricsContent(activeFontSize: CGFloat, inactiveFontSize: CGFloat) -> some View {
+    private func lyricsContent(activeFontSize: CGFloat, nextFontSize: CGFloat, inactiveFontSize: CGFloat) -> some View {
         ForEach(Array(viewModel.song.lyrics.enumerated()), id: \.element.id) { index, line in
-            let isActive = viewModel.lyricsService.activeLineIndex == index
-            let isPast = (viewModel.lyricsService.activeLineIndex ?? -1) > index
+            let activeIndex = viewModel.lyricsService.activeLineIndex ?? -1
+            let isActive = activeIndex == index
+            let isNext = activeIndex + 1 == index
+            let isPast = activeIndex > index
 
-            Text(line.text.isEmpty ? "~" : line.text)
-                .font(.system(size: isActive ? activeFontSize : inactiveFontSize))
-                .fontWeight(isActive ? .bold : .regular)
-                .foregroundColor(lyricColor(isActive: isActive, isPast: isPast))
+            let fontSize = isActive ? activeFontSize : (isNext ? nextFontSize : inactiveFontSize)
+            let weight: Font.Weight = isActive ? .heavy : (isNext ? .medium : .regular)
+
+            Text(line.text.isEmpty ? " " : line.text)
+                .font(.system(size: fontSize, weight: weight))
+                .foregroundColor(lyricColor(isActive: isActive, isNext: isNext, isPast: isPast))
+                .scaleEffect(isActive ? 1.05 : 1.0, anchor: .leading)
+                .shadow(color: isActive ? .cyan.opacity(0.6) : .clear, radius: 8, x: 0, y: 0)
                 .padding(.vertical, 8)
                 .id(index)
-                .animation(.easeInOut(duration: 0.2), value: isActive)
+                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isActive)
         }
     }
 
@@ -281,13 +388,15 @@ struct PlayerView: View {
         .padding(.vertical, 100)
     }
 
-    private func lyricColor(isActive: Bool, isPast: Bool) -> Color {
+    private func lyricColor(isActive: Bool, isNext: Bool, isPast: Bool) -> Color {
         if isActive {
-            return .cyan
+            return .white
+        } else if isNext {
+            return .white.opacity(0.7)
         } else if isPast {
-            return .white.opacity(0.4)
+            return .white.opacity(0.25)
         } else {
-            return .white.opacity(0.6)
+            return .white.opacity(0.5)
         }
     }
 }

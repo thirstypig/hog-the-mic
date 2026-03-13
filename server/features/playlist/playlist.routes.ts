@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { storage } from "../../storage";
 import { isAuthenticated } from "../../middleware";
 import { insertPlaylistSchema } from "@shared/schema";
+import { getPlaylistSongsWithDetails } from "./playlist.storage";
 
 export function registerPlaylistRoutes(app: Express) {
   // Get all user's playlists
@@ -114,6 +115,27 @@ export function registerPlaylistRoutes(app: Express) {
       res.json(playlistSongs);
     } catch (error) {
       console.error("Error fetching playlist songs:", error);
+      res.status(500).json({ error: "Failed to fetch playlist songs" });
+    }
+  });
+
+  // Get full song details for a playlist (for queue bulk-add)
+  app.get('/api/playlists/:id/songs/details', isAuthenticated, async (req: any, res) => {
+    try {
+      const playlist = await storage.getPlaylist(req.params.id);
+
+      if (!playlist) {
+        return res.status(404).json({ error: "Playlist not found" });
+      }
+
+      if (playlist.userId !== req.user.claims.sub) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const songs = await getPlaylistSongsWithDetails(req.params.id);
+      res.json(songs);
+    } catch (error) {
+      console.error("Error fetching playlist song details:", error);
       res.status(500).json({ error: "Failed to fetch playlist songs" });
     }
   });

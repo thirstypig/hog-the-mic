@@ -30,6 +30,9 @@ final class SocketPairingService: ObservableObject {
     private(set) var currentSessionId: String?
     private var currentTvSecret: String?
 
+    /// Handlers registered before socket exists — replayed on connect()
+    private var pendingHandlers: [(event: String, callback: ([Any]) -> Void)] = []
+
     // MARK: - Public API
 
     /// Connect to the Express server and join a session as the TV
@@ -54,6 +57,16 @@ final class SocketPairingService: ObservableObject {
 
         socket = manager?.socket(forNamespace: "/pairing")
         guard let socket = socket else { return }
+
+        // Replay any handlers that were registered before connect()
+        for pending in pendingHandlers {
+            let event = pending.event
+            let callback = pending.callback
+            socket.on(event) { data, _ in
+                callback(data)
+            }
+        }
+        pendingHandlers.removeAll()
 
         socket.on(clientEvent: .connect) { [weak self] _, _ in
             Task { @MainActor in
@@ -160,10 +173,15 @@ final class SocketPairingService: ObservableObject {
         socket?.emit(event, payload)
     }
 
-    /// Register a handler for a custom event
+    /// Register a handler for a custom event.
+    /// If socket doesn't exist yet (before connect()), the handler is deferred and replayed on connect().
     func on(_ event: String, callback: @escaping ([Any]) -> Void) {
-        socket?.on(event) { data, _ in
-            callback(data)
+        if let socket = socket {
+            socket.on(event) { data, _ in
+                callback(data)
+            }
+        } else {
+            pendingHandlers.append((event: event, callback: callback))
         }
     }
 
@@ -178,5 +196,6 @@ final class SocketPairingService: ObservableObject {
         currentSessionId = nil
         currentTvSecret = nil
         error = nil
+        pendingHandlers.removeAll()
     }
 }

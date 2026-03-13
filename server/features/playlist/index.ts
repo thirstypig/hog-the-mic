@@ -8,5 +8,6 @@ export {
   addSongToPlaylist,
   removeSongFromPlaylist,
   getPlaylistSongs,
+  getPlaylistSongsWithDetails,
   reorderPlaylistSongs,
 } from "./playlist.storage";

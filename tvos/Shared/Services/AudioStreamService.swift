@@ -15,6 +15,8 @@ final class AudioStreamService: ObservableObject {
 
     @Published var isReceiving = false
     @Published var audioLevel: Float = 0.0  // 0.0 – 1.0 normalized peak
+    @Published var chunksReceived: Int = 0
+    @Published var engineState: String = "stopped"  // stopped/running/error
 
     // MARK: - Private
 
@@ -58,6 +60,7 @@ final class AudioStreamService: ObservableObject {
                 guard let self = self,
                       let dict = data.first as? [String: Any],
                       let socketId = dict["socketId"] as? String else { return }
+                print("[AudioStream] audio_start from \(socketId)")
                 self.activeSenders.insert(socketId)
                 self.isReceiving = true
                 self.startEngineIfNeeded()
@@ -69,6 +72,7 @@ final class AudioStreamService: ObservableObject {
                 guard let self = self,
                       let dict = data.first as? [String: Any],
                       let socketId = dict["socketId"] as? String else { return }
+                print("[AudioStream] audio_stop from \(socketId)")
                 self.activeSenders.remove(socketId)
                 if self.activeSenders.isEmpty {
                     self.isReceiving = false
@@ -94,7 +98,10 @@ final class AudioStreamService: ObservableObject {
         do {
             try audioEngine.start()
             playerNode.play()
+            engineState = "running"
+            print("[AudioStream] Engine started successfully")
         } catch {
+            engineState = "error"
             print("[AudioStream] Failed to start engine: \(error)")
         }
     }
@@ -104,18 +111,26 @@ final class AudioStreamService: ObservableObject {
         if audioEngine.isRunning {
             audioEngine.stop()
         }
+        engineState = "stopped"
     }
 
     private func playChunk(base64: String) {
         guard let rawData = Data(base64Encoded: base64) else { return }
 
+        chunksReceived += 1
+        if chunksReceived % 20 == 0 {
+            print("[AudioStream] Received \(chunksReceived) chunks, engine: \(engineState), rawSize: \(rawData.count)")
+        }
+
         startEngineIfNeeded()
 
-        // WAV files have a 44-byte header; skip it to get raw PCM
-        let headerSize = 44
+        // Detect WAV header (starts with "RIFF") and skip it
         let pcmData: Data
-        if rawData.count > headerSize {
-            pcmData = rawData.subdata(in: headerSize..<rawData.count)
+        if rawData.count > 44,
+           rawData[0] == 0x52, rawData[1] == 0x49,
+           rawData[2] == 0x46, rawData[3] == 0x46
+        {
+            pcmData = rawData.subdata(in: 44..<rawData.count)
         } else {
             pcmData = rawData
         }
@@ -156,6 +171,8 @@ final class AudioStreamService: ObservableObject {
         activeSenders.removeAll()
         isReceiving = false
         audioLevel = 0
+        chunksReceived = 0
+        engineState = "stopped"
         socketService = nil
     }
 }

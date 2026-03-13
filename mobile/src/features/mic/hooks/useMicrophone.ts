@@ -2,19 +2,37 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import {
   useAudioRecorder,
   AudioModule,
-  RecordingPresets,
+  IOSOutputFormat,
   setAudioModeAsync,
 } from "expo-audio";
 import { File as ExpoFile } from "expo-file-system";
 import { getSocket } from "@features/pairing";
 import type { MicStatus } from "../types/mic.types";
 
-const CHUNK_DURATION_MS = 500;
+const CHUNK_DURATION_MS = 250;
 
-/** M4A recording (AAC) — most reliable on iOS, then send as base64 */
+/** WAV PCM recording — matches tvOS AudioStreamService expectations (16kHz mono 16-bit) */
 const RECORDING_OPTIONS = {
-  ...RecordingPresets.HIGH_QUALITY,
+  extension: ".wav",
+  sampleRate: 16000,
+  numberOfChannels: 1,
+  bitRate: 256000,
   isMeteringEnabled: false,
+  android: {
+    outputFormat: "default" as const,
+    audioEncoder: "default" as const,
+  },
+  ios: {
+    outputFormat: IOSOutputFormat.LINEARPCM,
+    audioQuality: 96,
+    linearPCMBitDepth: 16,
+    linearPCMIsBigEndian: false,
+    linearPCMIsFloat: false,
+  },
+  web: {
+    mimeType: "audio/wav",
+    bitsPerSecond: 256000,
+  },
 };
 
 export function useMicrophone() {

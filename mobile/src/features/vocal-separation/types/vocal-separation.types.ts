@@ -1,1 +1,6 @@
-export type GaudioStatus = "idle" | "processing" | "completed";
+export type SeparationStatus = "idle" | "processing" | "completed";
+
+export interface SeparationState {
+  status: SeparationStatus;
+  instrumentalUrl: string | null;
+}

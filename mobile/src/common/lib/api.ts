@@ -7,9 +7,9 @@
  */
 
 // TODO: Read from an env var / Expo config plugin for production builds.
-// For local development, use your machine's LAN IP (not localhost) so that
-// the tvOS simulator / physical device can reach the Express server.
-let _baseUrl = "http://192.168.6.12:4040";
+// Defaults to localhost for simulator/dev. Physical devices get the correct
+// URL from QR code scanning or manual entry (setApiBaseUrl).
+let _baseUrl = __DEV__ ? "http://192.168.4.23:4040" : "http://localhost:4040";
 
 export function setApiBaseUrl(url: string) {
   _baseUrl = url.replace(/\/+$/, "");
@@ -21,7 +21,7 @@ export function getApiBaseUrl(): string {
 
 /**
  * Build a full API URL from a relative path.
- * e.g. apiUrl("/api/songs") → "http://192.168.6.12:4040/api/songs"
+ * e.g. apiUrl("/api/songs") → "http://localhost:4040/api/songs"
  */
 export function apiUrl(path: string): string {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
