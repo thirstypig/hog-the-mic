@@ -6,7 +6,7 @@ YouTube-powered karaoke system with real-time device pairing, synced lyrics, and
 
 ## Sub-Projects
 
-All sub-projects live in this directory, each with its own git repo:
+All sub-projects are registered as [git submodules](https://git-scm.com/book/en/v2/Git-Tools-Submodules):
 
 | Directory | Description | Status |
 |-----------|-------------|--------|
@@ -36,6 +36,12 @@ Phone (Expo)                    Apple TV (SwiftUI)
 ## Quick Start
 
 ```bash
+# Clone with all sub-projects
+git clone --recurse-submodules https://github.com/thirstypig/ktv-singer.git
+
+# Or if already cloned, pull submodules
+git submodule update --init --recursive
+
 # Start the server
 cd ktv-singer-server && npm install && npm run dev
 

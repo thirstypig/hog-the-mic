@@ -1,0 +1,21 @@
+[submodule "ktv-singer-shared"]
+	path = ktv-singer-shared
+	url = https://github.com/thirstypig/ktv-singer-shared.git
+[submodule "ktv-singer-server"]
+	path = ktv-singer-server
+	url = https://github.com/thirstypig/ktv-singer-server.git
+[submodule "ktv-singer-app"]
+	path = ktv-singer-app
+	url = https://github.com/thirstypig/ktv-singer-app.git
+[submodule "ktv-singer-tvos"]
+	path = ktv-singer-tvos
+	url = https://github.com/thirstypig/ktv-singer-tvos.git
+[submodule "ktv-singer-docs"]
+	path = ktv-singer-docs
+	url = https://github.com/thirstypig/ktv-singer-docs.git
+[submodule "ktv-singer-infra"]
+	path = ktv-singer-infra
+	url = https://github.com/thirstypig/ktv-singer-infra.git
+[submodule "ktv-singer-web"]
+	path = ktv-singer-web
+	url = https://github.com/thirstypig/ktv-singer-web.git
