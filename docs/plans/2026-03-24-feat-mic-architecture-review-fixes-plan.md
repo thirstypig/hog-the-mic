@@ -447,11 +447,11 @@ In production, return generic messages to clients. Log details server-side only.
 - [x] Phone backgrounding / disconnect stops streaming cleanly
 - [x] tvOS auto-stops audio engine if no chunks for 5 seconds
 - [x] Android/web show "mic not supported" gracefully
-- [ ] Storage abstraction removed, routes import directly
-- [ ] Admin pages share layout module
-- [ ] Error responses consistently use `{ error: string }`
-- [ ] Zero `any` types in auth layer
-- [ ] Playlist updates validated with schema
+- [x] Storage abstraction removed, routes import directly
+- [ ] Admin pages share layout module *(deferred — ~800 LOC mechanical extraction)*
+- [x] Error responses consistently use `{ error: string }`
+- [ ] Zero `any` types in auth layer *(deferred — multiple files, no functional impact)*
+- [ ] Playlist updates validated with schema *(deferred — needs shared schema change)*
 
 ### Non-Functional Requirements
 - [ ] Audio latency from phone to TV under 300ms on home LAN *(needs hardware test)*
